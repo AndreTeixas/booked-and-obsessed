@@ -361,6 +361,8 @@ img { max-width: 100%; display: block; }
 .covergrid button { border: 2px solid transparent; border-radius: 6px; padding: 2px; background: none; }
 .covergrid button[aria-pressed="true"] { border-color: var(--accent); }
 .covergrid img { width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: 3px; }
+.covergrid button { display: flex; flex-direction: column; gap: 6px; color: var(--ink); text-align: left; }
+.cover-caption { font-size: 12px; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
 /* ---------- toast ---------- */
 .toast {

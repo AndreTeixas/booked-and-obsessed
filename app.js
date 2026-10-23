@@ -760,15 +760,20 @@ function renderCover(b) {
       <span class="eyebrow">Escolher capa</span>
     </div>
     <h2 class="sheet-title">${esc(cleanTitle(b.title))}</h2>
+    <div class="segmented" role="group" aria-label="Buscar capa por">
+      <button data-action="cover-mode" data-value="title" aria-pressed="${s.mode !== 'author'}">Título</button>
+      <button data-action="cover-mode" data-value="author" aria-pressed="${s.mode === 'author'}">Autora</button>
+    </div>
     <label class="search" for="cq">${ic.search}
-      <input id="cq" type="search" value="${esc(s.q || '')}" placeholder="Buscar outra edição" autocomplete="off" enterkeyhint="search">
+      <input id="cq" type="search" value="${esc(s.q || '')}" placeholder="${s.mode === 'author' ? 'Nome da autora' : 'Buscar outra edição'}" autocomplete="off" enterkeyhint="search">
     </label>
     ${s.loading ? '<p class="hint">Buscando edições…</p>' : ''}
     ${s.error ? `<p class="hint">${esc(s.error)}</p>` : ''}
     ${!s.loading && !s.error && !opts.length ? '<p class="hint">Nenhuma capa encontrada. Tente buscar pelo título em inglês ou pelo nome da autora.</p>' : ''}
     <div class="covergrid">
       ${opts.map((r) => `<button data-action="cover-pick" data-gid="${esc(r.gid)}" aria-pressed="${b.google_books_id === r.gid}" aria-label="${esc(r.title)} ${r.year || ''}">
-        <img src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>`).join('')}
+        <img src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">
+        ${s.mode === 'author' ? `<span class="cover-caption">${esc(r.title)}</span>` : ''}</button>`).join('')}
     </div>
   </div></div>`;
 }
@@ -818,7 +823,11 @@ async function runAddSearch(q) {
 async function runCoverSearch(q) {
   const s = state.sheet;
   s.q = q; s.loading = true; s.error = null; render();
-  try { s.results = await searchBooks(q, { max: 30 }); } catch (err) { s.error = searchErrorText(err); s.results = []; }
+  if (s.mode === 'author') s.authorQ = q; else s.titleQ = q;
+  if (!q.trim()) { s.loading = false; s.results = []; render(); return; }
+  try {
+    s.results = s.mode === 'author' ? await searchByAuthor(q) : await searchBooks(q, { max: 30 });
+  } catch (err) { s.error = searchErrorText(err); s.results = []; }
   if (state.sheet === s) { s.loading = false; render(); }
 }
 
@@ -908,7 +917,18 @@ document.addEventListener('click', async (e) => {
     }
     case 'cover': {
       const q = `${cleanTitle(b.title)} ${(b.author || '').split(',')[0]}`.trim();
-      state.sheet = { kind: 'cover', id: b.id, q, results: [] };
+      state.sheet = { kind: 'cover', id: b.id, q, mode: 'title', results: [] };
+      runCoverSearch(q); break;
+    }
+    case 'cover-mode': {
+      const mode = el.dataset.value;
+      if ((sheet.mode || 'title') === mode) break;
+      sheet.mode = mode;
+      sheet.results = [];
+      // Cada modo lembra a própria busca; na primeira vez, Autora começa com o nome da autora do livro.
+      const q = mode === 'author'
+        ? (sheet.authorQ ?? (b.author || '').split(',')[0].trim())
+        : (sheet.titleQ ?? `${cleanTitle(b.title)} ${(b.author || '').split(',')[0]}`.trim());
       runCoverSearch(q); break;
     }
     case 'cover-pick': {
