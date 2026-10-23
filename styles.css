@@ -143,6 +143,7 @@ img { max-width: 100%; display: block; }
   gap: 18px;
 }
 
+.lib-body { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .lib-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
 .lib-head h1 { margin: 0; font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 48px; line-height: 0.95; }
 .lib-head .actions { display: flex; gap: 8px; align-items: center; }

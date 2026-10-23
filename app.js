@@ -200,6 +200,8 @@ async function loadBooks() {
   state.books = data || [];
   state.loaded = true;
   render();
+  // Capas que ainda apontam para sites externos são copiadas para o Storage em segundo plano.
+  migrateExternalCovers();
 }
 
 const pending = new Map();
@@ -235,6 +237,34 @@ async function deleteBook(id) {
   state.sheet = null;
   toast('Livro excluído');
   render();
+}
+
+/* ---------------- capas guardadas no Supabase ---------------- */
+const STORED_MARK = '/storage/v1/object/public/covers/';
+const isStored = (url) => typeof url === 'string' && url.includes(STORED_MARK);
+
+// Copia a capa externa para o Storage. Se não der certo, o livro continua com o endereço externo.
+async function cacheCover(bookId, url) {
+  if (!url || isStored(url)) return false;
+  try {
+    const { data, error } = await sb.functions.invoke('cache-cover', { body: { book_id: bookId, url } });
+    if (error || !data?.cover_url) return false;
+    const b = byId(bookId);
+    if (b) { b.cover_url = data.cover_url; b.cover_source_url = url; }
+    return true;
+  } catch { return false; }
+}
+
+let migrating = false;
+async function migrateExternalCovers() {
+  if (migrating) return;
+  migrating = true;
+  const list = state.books.filter((b) => b.cover_url && !isStored(b.cover_url));
+  for (const b of list) {
+    await cacheCover(b.id, b.cover_url);
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  migrating = false;
 }
 
 /* ---------------- capas em lote ---------------- */
@@ -280,6 +310,7 @@ async function fetchMissingCovers() {
         b.google_books_id = hit.gid;
         const { error } = await sb.from('books').update({ cover_url: hit.cover, google_books_id: hit.gid }).eq('id', b.id);
         if (error) throw new SearchError('save');
+        await cacheCover(b.id, hit.cover);
         state.coverJob.found++;
       }
       // Só desiste do livro se o Google respondeu de verdade (ou se achou capa).
@@ -302,30 +333,80 @@ async function fetchMissingCovers() {
 }
 
 /* ---------------- render: auth ---------------- */
+const SITE_URL = location.origin + location.pathname;
+
 function renderAuth() {
-  const signup = state.authMode === 'signup';
+  const mode = state.authMode; // login | signup | forgot
   const msg = state.authMsg;
+  const tagline = { login: 'Entre para abrir sua Library.', signup: 'Crie sua conta para guardar suas leituras.', forgot: 'Digite seu e-mail e enviamos um link para criar uma senha nova.' }[mode];
+  const submit = { login: 'Entrar', signup: 'Criar conta', forgot: 'Enviar link' }[mode];
   app.innerHTML = `
   <main class="auth">
     <div>
       <span class="eyebrow">for readers who feel too much</span>
       <h1>Booked &amp; Obsessed</h1>
-      <p class="tagline">${signup ? 'Crie sua conta para guardar suas leituras.' : 'Entre para abrir sua Library.'}</p>
+      <p class="tagline">${tagline}</p>
     </div>
     <form id="authForm" novalidate>
       <div class="field"><label for="email">E-mail</label>
-        <input class="input" id="email" name="email" type="email" autocomplete="email" required></div>
-      <div class="field"><label for="password">Senha</label>
-        <input class="input" id="password" name="password" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="6" required></div>
+        <input class="input" id="email" name="email" type="email" autocomplete="email" required value="${esc(state.authEmail || '')}"></div>
+      ${mode === 'forgot' ? '' : `<div class="field"><label for="password">Senha</label>
+        <input class="input" id="password" name="password" type="password" autocomplete="${mode === 'signup' ? 'new-password' : 'current-password'}" minlength="6" required></div>`}
       ${msg ? `<p class="msg ${msg.error ? 'error' : ''}">${esc(msg.text)}</p>` : ''}
-      <button class="btn primary" type="submit">${signup ? 'Criar conta' : 'Entrar'}</button>
+      <button class="btn primary" type="submit">${submit}</button>
     </form>
-    <button class="linkbtn" type="button" data-action="toggle-auth">${signup ? 'Já tenho conta' : 'Primeira vez aqui? Criar conta'}</button>
+    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
+      ${mode === 'login' ? '<button class="linkbtn" type="button" data-action="auth-mode" data-value="forgot">Esqueci minha senha</button>' : ''}
+      ${mode !== 'login' ? '<button class="linkbtn" type="button" data-action="auth-mode" data-value="login">Voltar para entrar</button>' : ''}
+      ${mode === 'login' ? '<button class="linkbtn" type="button" data-action="auth-mode" data-value="signup">Primeira vez aqui? Criar conta</button>' : ''}
+    </div>
   </main>`;
+}
+
+function renderRecovery() {
+  const msg = state.authMsg;
+  app.innerHTML = `
+  <main class="auth">
+    <div>
+      <span class="eyebrow">Booked &amp; Obsessed</span>
+      <h1>Nova senha</h1>
+      <p class="tagline">Escolha uma senha nova para entrar na sua Library.</p>
+    </div>
+    <form id="recoveryForm" novalidate>
+      <div class="field"><label for="newpass">Senha nova</label>
+        <input class="input" id="newpass" name="newpass" type="password" autocomplete="new-password" minlength="6" required></div>
+      ${msg ? `<p class="msg ${msg.error ? 'error' : ''}">${esc(msg.text)}</p>` : ''}
+      <button class="btn primary" type="submit">Salvar senha</button>
+    </form>
+  </main>`;
+}
+
+async function onRecoverySubmit(form) {
+  const password = form.newpass.value;
+  if (password.length < 6) { state.authMsg = { error: true, text: 'A senha precisa ter pelo menos 6 caracteres.' }; renderRecovery(); return; }
+  form.querySelector('button[type=submit]').disabled = true;
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) { state.authMsg = { error: true, text: traduzErro(error.message) }; renderRecovery(); return; }
+  state.recovery = false;
+  state.authMsg = null;
+  toast('Senha atualizada');
+  render();
+  if (!state.loaded) loadBooks();
 }
 
 async function onAuthSubmit(form) {
   const email = form.email.value.trim();
+  state.authEmail = email;
+  if (state.authMode === 'forgot') {
+    if (!email) { state.authMsg = { error: true, text: 'Digite o e-mail da sua conta.' }; renderAuth(); return; }
+    form.querySelector('button[type=submit]').disabled = true;
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: SITE_URL });
+    state.authMsg = error && /rate limit/i.test(error.message)
+      ? { error: true, text: traduzErro(error.message) }
+      : { error: false, text: `Se ${email} tiver conta, o link para criar uma senha nova já está a caminho. Confira também a caixa de spam.` };
+    renderAuth();
+    return;
+  }
   const password = form.password.value;
   if (!email || password.length < 6) {
     state.authMsg = { error: true, text: 'Preencha o e-mail e uma senha com pelo menos 6 caracteres.' };
@@ -337,7 +418,7 @@ async function onAuthSubmit(form) {
   if (state.authMode === 'signup') {
     const { data, error } = await sb.auth.signUp({
       email, password,
-      options: { emailRedirectTo: location.origin + location.pathname },
+      options: { emailRedirectTo: SITE_URL },
     });
     if (error) state.authMsg = { error: true, text: traduzErro(error.message) };
     else if (!data.session) state.authMsg = { error: false, text: `Enviamos um e-mail de confirmação para ${email}. Abra o link e depois entre aqui.` };
@@ -354,6 +435,8 @@ function traduzErro(m = '') {
   if (/already registered/i.test(m)) return 'Esse e-mail já tem conta. Use "Já tenho conta".';
   if (/signups? not allowed|not allowed/i.test(m)) return 'Novos cadastros estão fechados.';
   if (/rate limit/i.test(m)) return 'Muitas tentativas. Espere alguns minutos e tente de novo.';
+  if (/different from the old|same password/i.test(m)) return 'A senha nova precisa ser diferente da antiga.';
+  if (/weak|at least/i.test(m)) return 'Escolha uma senha mais forte, com pelo menos 6 caracteres.';
   return 'Algo deu errado. Tente de novo.';
 }
 
@@ -388,6 +471,35 @@ function cardMeta(b) {
 
 function renderLibrary() {
   const total = state.books.length;
+  return `
+  <div class="page">
+    <header class="lib-head">
+      <div>
+        <span class="eyebrow">${total} ${total === 1 ? 'livro' : 'livros'}</span>
+        <h1>Library</h1>
+      </div>
+      <div class="actions">
+        <button class="iconbtn" data-action="logout" aria-label="Sair da conta">${ic.out}</button>
+        <button class="fab" data-action="add" aria-label="Adicionar livro">${ic.plus}</button>
+      </div>
+    </header>
+
+    <label class="search" for="q">${ic.search}
+      <input id="q" type="search" placeholder="Buscar título, autora ou trope" value="${esc(state.query)}" autocomplete="off">
+    </label>
+
+    <div id="libBody" class="lib-body">${libBodyHTML()}</div>
+  </div>`;
+}
+
+// Só esta parte é redesenhada enquanto a busca é digitada.
+function updateLibBody() {
+  const el = document.getElementById('libBody');
+  if (el) el.innerHTML = libBodyHTML();
+}
+
+function libBodyHTML() {
+  const total = state.books.length;
   const counts = Object.fromEntries(STATUSES.map((s) => [s.id, state.books.filter((b) => b.status === s.id).length]));
   const list = visibleBooks();
   const missing = missingCovers().length;
@@ -419,22 +531,6 @@ function renderLibrary() {
             </button>`).join('')}</div>`;
 
   return `
-  <div class="page">
-    <header class="lib-head">
-      <div>
-        <span class="eyebrow">${total} ${total === 1 ? 'livro' : 'livros'}</span>
-        <h1>Library</h1>
-      </div>
-      <div class="actions">
-        <button class="iconbtn" data-action="logout" aria-label="Sair da conta">${ic.out}</button>
-        <button class="fab" data-action="add" aria-label="Adicionar livro">${ic.plus}</button>
-      </div>
-    </header>
-
-    <label class="search" for="q">${ic.search}
-      <input id="q" type="search" placeholder="Buscar título, autora ou trope" value="${esc(state.query)}" autocomplete="off">
-    </label>
-
     <div class="tabs" role="tablist" aria-label="Status">
       ${STATUSES.map((s) => `<button class="tab" role="tab" data-action="status" data-value="${s.id}" aria-selected="${!state.query && state.filter.type === 'status' && state.filter.value === s.id}">${s.tab} <sup>${counts[s.id]}</sup></button>`).join('')}
     </div>
@@ -451,8 +547,7 @@ function renderLibrary() {
     ${banner}
 
     <div class="section-line"><h2>${filterLabel}</h2><span>${list.length} ${list.length === 1 ? 'livro' : 'livros'}</span></div>
-    ${body}
-  </div>`;
+    ${body}`;
 }
 
 function renderNav() {
@@ -531,6 +626,8 @@ function renderBook(b) {
     </div>
 
     <div class="rows">
+      <div class="row"><label for="f-title">Título</label><div class="ctrl"><input id="f-title" type="text" data-field="title" value="${esc(b.title)}" autocomplete="off"></div></div>
+      <div class="row"><label for="f-author">Autora</label><div class="ctrl"><input id="f-author" type="text" data-field="author" value="${esc(b.author || '')}" autocomplete="off"></div></div>
       <div class="row"><label for="f-status">Status</label><div class="ctrl">
         <select id="f-status" data-field="status">${STATUSES.map((s) => `<option value="${s.id}" ${b.status === s.id ? 'selected' : ''}>${s.one}</option>`).join('')}</select></div></div>
       ${b.status === 'lendo' ? `<div class="row"><label for="f-cur">Página atual</label><div class="ctrl"><input id="f-cur" class="num" type="number" inputmode="numeric" min="0" data-field="current_page" value="${b.current_page ?? ''}"></div></div>` : ''}
@@ -648,6 +745,11 @@ function renderCover(b) {
 
 /* ---------------- render principal ---------------- */
 function render() {
+  if (state.recovery) {
+    // Não apaga a senha que está sendo digitada se outra parte do app pedir um redesenho.
+    if (!document.getElementById('recoveryForm') || state.authMsg) renderRecovery();
+    return;
+  }
   if (!state.session) { renderAuth(); return; }
   const active = document.activeElement;
   const focusId = active?.id;
@@ -672,6 +774,7 @@ function render() {
 
 /* ---------------- ações ---------------- */
 let searchTimer;
+let libTimer;
 async function runAddSearch(q) {
   const s = state.sheet;
   s.q = q;
@@ -697,8 +800,11 @@ document.addEventListener('click', async (e) => {
   const b = sheet?.id ? byId(sheet.id) : null;
 
   switch (a) {
-    case 'toggle-auth':
-      state.authMode = state.authMode === 'login' ? 'signup' : 'login'; state.authMsg = null; renderAuth(); break;
+    case 'auth-mode': {
+      const em = document.getElementById('email')?.value;
+      if (em) state.authEmail = em.trim();
+      state.authMode = el.dataset.value; state.authMsg = null; renderAuth(); break;
+    }
     case 'logout':
       await sb.auth.signOut(); break;
     case 'status':
@@ -725,7 +831,10 @@ document.addEventListener('click', async (e) => {
       const status = document.getElementById('p-status').value;
       el.disabled = true;
       const row = await insertBook({ title: p.title, author: p.author || null, pages: p.pages, language: p.language, cover_url: p.cover, google_books_id: p.gid, status, current_page: status === 'lendo' ? 0 : null });
-      if (row) { state.sheet = { kind: 'book', id: row.id }; toast('Adicionado à Library'); render(); }
+      if (row) {
+        state.sheet = { kind: 'book', id: row.id }; toast('Adicionado à Library'); render();
+        if (p.cover && await cacheCover(row.id, p.cover)) render();
+      }
       else el.disabled = false;
       break;
     }
@@ -765,8 +874,18 @@ document.addEventListener('click', async (e) => {
     }
     case 'cover-pick': {
       const r = sheet.results.find((x) => x.gid === el.dataset.gid);
-      updateBook(b.id, { cover_url: r.cover, google_books_id: r.gid }, { rerender: false });
-      state.sheet = { kind: 'book', id: b.id }; render(); break;
+      const oldCover = b.cover_url;
+      b.cover_url = r.cover; b.google_books_id = r.gid;
+      state.sheet = { kind: 'book', id: b.id }; render();
+      // A função copia a imagem para o Storage e já grava o novo endereço no livro.
+      if (await cacheCover(b.id, r.cover)) {
+        await sb.from('books').update({ google_books_id: r.gid }).eq('id', b.id);
+        toast('Capa trocada');
+      } else {
+        const { error } = await sb.from('books').update({ cover_url: r.cover, google_books_id: r.gid }).eq('id', b.id);
+        if (error) { b.cover_url = oldCover; toast('Não consegui trocar a capa.', true); } else toast('Capa trocada');
+      }
+      render(); break;
     }
     case 'cover-remove':
       sheet.keepScroll = true;
@@ -782,6 +901,7 @@ document.addEventListener('click', async (e) => {
 document.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (e.target.id === 'authForm') onAuthSubmit(e.target);
+  if (e.target.id === 'recoveryForm') onRecoverySubmit(e.target);
   if (e.target.id === 'manualForm') {
     const f = e.target;
     const title = f.title.value.trim();
@@ -794,7 +914,12 @@ document.addEventListener('submit', async (e) => {
 
 document.addEventListener('input', (e) => {
   const t = e.target;
-  if (t.id === 'q') { state.query = t.value; render(); return; }
+  if (t.id === 'q') {
+    state.query = t.value;
+    clearTimeout(libTimer);
+    libTimer = setTimeout(updateLibBody, 140);
+    return;
+  }
   if (t.id === 'gq') { clearTimeout(searchTimer); const v = t.value; state.sheet.q = v; searchTimer = setTimeout(() => runAddSearch(v), 450); return; }
   if (t.id === 'cq') { clearTimeout(searchTimer); const v = t.value; searchTimer = setTimeout(() => runCoverSearch(v), 450); return; }
   if (t.id === 'why') {
@@ -811,7 +936,8 @@ document.addEventListener('change', (e) => {
   let v;
   if (t.type === 'checkbox') v = t.checked;
   else if (t.type === 'number') v = t.value === '' ? null : Number(t.value);
-  else v = t.value === '' ? null : t.value;
+  else v = t.value.trim() === '' ? null : t.value.trim();
+  if (field === 'title' && !v) { toast('O título não pode ficar vazio.', true); t.value = b.title; return; }
   const patch = { [field]: v };
   if (field === 'status' && v === 'lido' && !b.finished_at) patch.finished_at = new Date().toISOString().slice(0, 10);
   if (field === 'status' && v === 'lido' && b.pages) patch.current_page = b.pages;
@@ -838,9 +964,10 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---------------- início ---------------- */
-sb.auth.onAuthStateChange((_event, session) => {
+sb.auth.onAuthStateChange((event, session) => {
   const was = state.session?.user?.id;
   state.session = session;
+  if (event === 'PASSWORD_RECOVERY') { state.recovery = true; state.authMsg = null; renderRecovery(); return; }
   if (!session) { state.books = []; state.loaded = false; state.sheet = null; renderAuth(); return; }
   if (was !== session.user.id) { state.authMsg = null; render(); loadBooks(); }
 });
