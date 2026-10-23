@@ -19,16 +19,20 @@ const STATUSES = [
   { id: 'abandonado', tab: 'Abandonados', one: 'Abandonado' },
 ];
 const OBSESSION = [
-  { id: 'obsessed', label: 'Obsessed' },
-  { id: 'destruiu', label: 'Me destruiu' },
-  { id: 'amei', label: 'Amei' },
-  { id: 'gostei', label: 'Gostei' },
-  { id: 'bonzinho', label: 'Bonzinho' },
-  { id: 'gastei', label: 'Gastei tempo' },
+  { id: 'obsessed', label: 'OBSESSED ❤️‍🔥🔥' },
+  { id: 'destruiu', label: 'Me destruiu 💀😭' },
+  { id: 'amei', label: 'Amei ❤️🤩' },
+  { id: 'gostei', label: 'Gostei 🥰' },
+  { id: 'bonzinho', label: 'Bonzinho 🙂' },
+  { id: 'gastei', label: 'Gastei tempo 😒' },
+];
+const LANGUAGES = [
+  { id: 'pt', label: 'Português' },
+  { id: 'en', label: 'Inglês' },
 ];
 const GENRES = ['Romance', 'Romantasia', 'Sports Romance', 'Mafia Romance', 'Dark Romance', 'Cowboy', 'SMUT'];
 const COLLECTIONS = [
-  { id: 'favoritos', label: 'Favoritos', cls: 'c-blush', test: (b) => b.rating === 6 },
+  { id: 'favoritos', label: 'Favoritos', cls: 'c-blush', test: (b) => b.sparkle && b.rating },
   { id: 'boyfriends', label: 'Book boyfriends', cls: 'c-sage', test: (b) => (b.book_boyfriends || []).length > 0 },
   { id: 'hot', label: 'Mais hot', cls: 'c-peach', test: (b) => (b.spicy || 0) >= 4 },
   { id: 'damage', label: 'Emotional damage', cls: 'c-blush', test: (b) => b.obsession === 'destruiu' },
@@ -43,11 +47,75 @@ const ic = {
   plus: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   back: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
   out: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>',
-  star: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z"/></svg>',
-  sparkle: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2 8 8 2-8 2-2 8-2-8-8-2 8-2z"/></svg>',
-  pepper: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 9c4-1 10 1 10 7 0 3-3 5-6 4S6 15 8 9z"/><path d="M8 9c-1-2 0-4 2-5"/></svg>',
-  pepperFill: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 9c4-1 10 1 10 7 0 3-3 5-6 4S6 15 8 9z"/><path d="M8 9c-1-2 0-4 2-5" fill="none"/></svg>',
+  star: '<svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z"/></svg>',
+  sparkle: '<svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 3l1.8 6.2L18 11l-6.2 1.8L10 19l-1.8-6.2L2 11l6.2-1.8z"/><path d="M18.5 2.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/><path d="M18 15.5l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></svg>',
+  // Pimenta com cores de emoji: corpo vermelho e cabinho verde.
+  pepperOn: '<svg width="21" height="21" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 9c4-1 10 1 10 7 0 3-3 5-6 4S6 15 8 9z" fill="#D7263D" stroke="#B51D31" stroke-width="1.2"/><path d="M8 9c-1-2 0-4 2-5" fill="none" stroke="#3E9142" stroke-width="2"/><path d="M6.5 9.5c1-.9 2.4-1 3.6-.6" fill="none" stroke="#3E9142" stroke-width="2"/></svg>',
+  pepperOff: '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 9c4-1 10 1 10 7 0 3-3 5-6 4S6 15 8 9z"/><path d="M8 9c-1-2 0-4 2-5"/></svg>',
+  chevron: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
+  check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  palette: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.8 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.1" fill="currentColor"/><circle cx="10" cy="7" r="1.1" fill="currentColor"/><circle cx="15" cy="7" r="1.1" fill="currentColor"/></svg>',
+  moon: '<svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 3.2A8.5 8.5 0 1 0 20.8 15 6.8 6.8 0 0 1 15.5 3.2z" fill="#B9A4E8"/></svg>',
 };
+
+/* ---------------- temas ---------------- */
+// As cores de cada tema ficam no styles.css; aqui ficam o nome, a prévia e a fonte do título.
+const THEMES = [
+  { id: 'editorial', name: 'Editorial', note: 'Claro ou escuro conforme o aparelho', bg: '#FAF6F2', ink: '#2B2326', accent: '#8C5A6A', meta: '#8C5A6A', font: "'Cormorant Garamond', Georgia, serif", style: 'italic', weight: 500, caps: false, spines: ['#4A2F3F', '#B5747B', '#3E3A6B'] },
+  { id: 'noite', name: 'Noite Estrelada', note: 'Romantasia de cortes feéricas', bg: '#141A33', ink: '#E9E6F5', accent: '#C9CCE8', meta: '#D9B76A', font: "Cinzel, Georgia, serif", style: 'normal', weight: 600, caps: false, spines: ['#3E3A6B', '#4F5E73', '#D9B76A'], fonts: 'Cinzel:wght@500;600' },
+  { id: 'lua', name: 'Lua Crescente', note: 'Fantasia urbana', bg: '#1C1B22', ink: '#EDE8F2', accent: '#B9A4E8', meta: '#7FD1C7', font: "Italiana, Didot, Georgia, serif", style: 'normal', weight: 400, caps: false, spines: ['#4A2F3F', '#B9A4E8', '#2F4A5C'], fonts: 'Italiana' },
+  { id: 'rancho', name: 'Rancho', note: 'Cowboy romance', bg: '#F3EBDD', ink: '#2E2A26', accent: '#3E5C7A', meta: '#A0612F', font: "Bitter, Rockwell, Georgia, serif", style: 'italic', weight: 700, caps: false, spines: ['#9A6B4A', '#3E5C7A', '#6F7F52'], fonts: 'Bitter:ital,wght@1,600;1,700' },
+  { id: 'rinque', name: 'Rinque', note: 'Sports romance', bg: '#F4F7FA', ink: '#142235', accent: '#C8102E', meta: '#C8102E', font: "Oswald, 'Arial Narrow', sans-serif", style: 'normal', weight: 600, caps: true, spines: ['#1D3A6B', '#C8102E', '#2F4A5C'], fonts: 'Oswald:wght@500;600' },
+  { id: 'famiglia', name: 'Famiglia', note: 'Mafia romance', bg: '#121011', ink: '#F2E9DC', accent: '#C9A45C', meta: '#C9A45C', font: "'Bodoni Moda', Didot, Georgia, serif", style: 'italic', weight: 500, caps: false, spines: ['#26232A', '#5C3A4E', '#C9A45C'], fonts: 'Bodoni+Moda:ital,opsz,wght@1,6..96,500' },
+  { id: 'sombra', name: 'Sombra', note: 'Dark romance', bg: '#0B0A0B', ink: '#EDE4E4', accent: '#B3122E', meta: '#D8475E', font: "'Playfair Display', Georgia, serif", style: 'italic', weight: 800, caps: false, spines: ['#26232A', '#B3122E', '#4A2F3F'], fonts: 'Playfair+Display:ital,wght@1,700;1,800' },
+];
+const THEME_KEY = 'bo.theme';
+const themeById = (id) => THEMES.find((t) => t.id === id) || THEMES[0];
+
+const loadedFonts = new Set();
+function ensureFont(t) {
+  if (!t.fonts || loadedFonts.has(t.id)) return;
+  loadedFonts.add(t.id);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${t.fonts}&display=swap`;
+  document.head.appendChild(link);
+}
+
+function applyTheme(id) {
+  const t = themeById(id);
+  ensureFont(t);
+  if (t.id === 'editorial') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = t.id;
+  state.theme = t.id;
+  try { localStorage.setItem(THEME_KEY, t.id); } catch { /* sem armazenamento local */ }
+  // Cor da barra do navegador acompanha o fundo do tema.
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => { m.content = bg; m.removeAttribute('media'); });
+}
+
+async function chooseTheme(id) {
+  applyTheme(id);
+  render();
+  const { error } = await sb.auth.updateUser({ data: { theme: id } });
+  if (error) toast('O tema mudou aqui, mas não consegui salvar na sua conta.', true);
+}
+
+function ornamentHTML() {
+  switch (state.theme) {
+    case 'noite': return `<svg class="orn-stars" width="190" height="120" viewBox="0 0 190 120" aria-hidden="true">
+        <path d="M110 18l2.5 9 9 2.5-9 2.5-2.5 9-2.5-9-9-2.5 9-2.5z" fill="#D9B76A"/>
+        <path d="M155 50l1.6 6 6 1.6-6 1.6-1.6 6-1.6-6-6-1.6 6-1.6z" fill="#C9CCE8"/>
+        <path d="M72 62l1.2 4.5 4.5 1.2-4.5 1.2-1.2 4.5-1.2-4.5-4.5-1.2 4.5-1.2z" fill="#C9CCE8"/>
+        <circle cx="30" cy="16" r="1.2" fill="#C9CCE8"/><circle cx="182" cy="10" r="1" fill="#C9CCE8"/>
+        <circle cx="128" cy="84" r="1" fill="#D9B76A"/><circle cx="12" cy="46" r=".9" fill="#C9CCE8"/></svg>`;
+    case 'rancho': return '<div class="orn orn-stitch" aria-hidden="true"></div>';
+    case 'rinque': return '<div class="orn orn-stripes" aria-hidden="true"><i></i><i></i></div>';
+    case 'famiglia': return '<div class="orn orn-double" aria-hidden="true"><i></i><i></i></div>';
+    case 'sombra': return '<div class="orn orn-drop" aria-hidden="true"><i></i><svg width="10" height="14" viewBox="0 0 10 14"><path d="M5 0C5 0 0 6.5 0 9.2A5 5 0 0 0 10 9.2C10 6.5 5 0 5 0z" fill="#B3122E"/></svg><i></i></div>';
+    default: return '';
+  }
+}
 
 /* ---------------- estado ---------------- */
 const state = {
@@ -56,7 +124,9 @@ const state = {
   loaded: false,
   filter: { type: 'status', value: 'lido' },
   query: '',
-  sheet: null, // { kind: 'book'|'add'|'cover', id?, ... }
+  sheet: null, // { kind: 'book'|'add'|'cover'|'themes', id?, ... }
+  dd: null, // menu suspenso aberto
+  theme: 'editorial',
   authMode: 'login',
   authMsg: null,
   coverJob: null, // { done, total }
@@ -83,12 +153,39 @@ const fmtDate = (d) => {
 };
 
 let toastTimer;
-function toast(msg, isError = false) {
-  toastEl.textContent = msg;
+let toastUndo = null;
+function toast(msg, isError = false, undo = null) {
+  toastUndo = undo;
+  toastEl.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button class="toast-btn" data-action="toast-undo">Desfazer</button>' : ''}`;
   toastEl.classList.toggle('error', isError);
   toastEl.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (toastEl.hidden = true), isError ? 4000 : 1800);
+  toastTimer = setTimeout(() => { toastEl.hidden = true; toastUndo = null; }, isError ? 4000 : undo ? 6000 : 1800);
+}
+
+// Nome da fonte de onde a capa veio, para mostrar embaixo dela.
+function sourceName(url) {
+  const u = String(url || '');
+  if (u === 'upload') return 'Foto enviada';
+  if (/google/.test(u)) return 'Google Books';
+  if (/openlibrary|archive\.org/.test(u)) return 'Open Library';
+  return '';
+}
+const coverSource = (b) => (b.cover_url ? sourceName(b.cover_source_url || b.cover_url) : '');
+const resultSource = (r) => (r.source === 'google' ? 'Google Books' : r.source === 'openlibrary' ? 'Open Library' : '');
+
+// Menu suspenso desenhado pelo app (o nativo fica ilegível no modo escuro em alguns aparelhos).
+function ddHTML(key, current, options, { placeholder = 'escolher', cls = '', label = '' } = {}) {
+  const open = state.dd === key;
+  const cur = options.find((o) => o.id === current);
+  return `<div class="dd ${cls}">
+    <button type="button" class="dd-btn" data-action="dd-open" data-dd="${key}" aria-haspopup="listbox" aria-expanded="${open}" ${label ? `aria-label="${esc(label)}: ${esc(cur ? cur.label : placeholder)}"` : ''}>
+      <span class="${cur ? '' : 'dd-ph'}">${esc(cur ? cur.label : placeholder)}</span>${ic.chevron}</button>
+    ${open ? `<div class="dd-menu" role="listbox">
+      ${options.map((o) => `<button type="button" role="option" class="dd-opt" aria-selected="${o.id === current}" data-action="dd-pick" data-dd="${key}" data-value="${esc(o.id)}">
+        <span>${esc(o.label)}</span>${o.id === current ? ic.check : ''}</button>`).join('')}
+    </div>` : ''}
+  </div>`;
 }
 
 function coverHTML(b, size = '') {
@@ -251,7 +348,7 @@ function updateBook(id, patch, { quiet = false, rerender = true } = {}) {
     pending.delete(id);
     const { error } = await sb.from('books').update(p).eq('id', id);
     if (error) toast('Não salvou. Tente de novo em instantes.', true);
-    else if (!quiet) toast('Salvo');
+    else if (!quiet && !toastUndo) toast('Salvo'); // não esconde um aviso com "Desfazer"
   }, 500);
 }
 
@@ -572,7 +669,7 @@ function visibleBooks() {
 function cardMeta(b) {
   if (b.status === 'lendo' && b.pages) return `${Math.round(((b.current_page || 0) / b.pages) * 100)}% lido`;
   if (b.obsession) return obsLabel(b.obsession);
-  if (b.rating === 6) return 'Favorito';
+  if (b.sparkle && b.rating) return 'Favorito';
   return '';
 }
 
@@ -580,16 +677,20 @@ function renderLibrary() {
   const total = state.books.length;
   return `
   <div class="page">
+    ${state.theme === 'noite' ? ornamentHTML() : ''}
     <header class="lib-head">
       <div>
         <span class="eyebrow">${total} ${total === 1 ? 'livro' : 'livros'}</span>
         <h1>Library</h1>
       </div>
       <div class="actions">
+        ${state.theme === 'lua' ? ic.moon : ''}
+        <button class="iconbtn" data-action="themes" aria-label="Temas">${ic.palette}</button>
         <button class="iconbtn" data-action="logout" aria-label="Sair da conta">${ic.out}</button>
         <button class="fab" data-action="add" aria-label="Adicionar livro">${ic.plus}</button>
       </div>
     </header>
+    ${state.theme !== 'noite' ? ornamentHTML() : ''}
 
     <label class="search" for="q">${ic.search}
       <input id="q" type="search" placeholder="Buscar título, autora ou trope" value="${esc(state.query)}" autocomplete="off">
@@ -677,20 +778,22 @@ function renderNav() {
 }
 
 /* ---------------- render: ficha ---------------- */
+// Nota de 1 a 5, em estrelas ou em brilhos (escala própria, acima das estrelas).
 function ratingHTML(b) {
   const r = b.rating || 0;
-  const sparkle = r === 6;
-  const btns = [1, 2, 3, 4, 5].map((i) => {
-    const on = sparkle || r >= i;
-    return `<button data-action="rate" data-value="${i}" class="${on ? '' : 'off'}" aria-label="${i} ${i === 1 ? 'estrela' : 'estrelas'}">${sparkle ? ic.sparkle : ic.star}</button>`;
-  }).join('');
-  return `<div class="rating">${btns}</div>
-    <button class="sparkle-toggle" data-action="sparkle" aria-pressed="${sparkle}">${sparkle ? 'acima de 5' : '+ brilho'}</button>`;
+  const sp = !!b.sparkle;
+  const unit = sp ? ['brilho', 'brilhos'] : ['estrela', 'estrelas'];
+  const btns = [1, 2, 3, 4, 5].map((i) => `<button data-action="rate" data-value="${i}" class="${r >= i ? 'on' : 'off'}" aria-label="${i} ${i === 1 ? unit[0] : unit[1]}">${sp ? ic.sparkle : ic.star}</button>`).join('');
+  return `<div class="rating ${sp ? 'is-sparkle' : 'is-star'}">${btns}</div>
+    <div class="kind-toggle" role="group" aria-label="Tipo de nota">
+      <button data-action="rate-kind" data-value="star" aria-pressed="${!sp}">estrelas</button>
+      <button data-action="rate-kind" data-value="sparkle" aria-pressed="${sp}">brilhos</button>
+    </div>`;
 }
 
 function spicyHTML(b) {
   const s = b.spicy || 0;
-  return `<div class="spicy">${[1, 2, 3, 4, 5].map((i) => `<button data-action="spicy" data-value="${i}" class="${s >= i ? '' : 'off'}" aria-label="Spicy ${i} de 5">${s >= i ? ic.pepperFill : ic.pepper}</button>`).join('')}</div>`;
+  return `<div class="spicy">${[1, 2, 3, 4, 5].map((i) => `<button data-action="spicy" data-value="${i}" class="${s >= i ? 'on' : 'off'}" aria-label="Spicy ${i} de 5">${s >= i ? ic.pepperOn : ic.pepperOff}</button>`).join('')}</div>`;
 }
 
 function chipList(b, field, placeholder) {
@@ -713,6 +816,7 @@ function renderBook(b) {
 
     <div class="hero">
       ${coverHTML(b, 'lg')}
+      ${coverSource(b) ? `<span class="cover-src">${coverSource(b)}</span>` : ''}
       <div class="covertools">
         <button class="linkbtn" data-action="cover">${b.cover_url ? 'Trocar capa' : 'Buscar capa'}</button>
         <label class="linkbtn" for="coverFile" role="button" tabindex="0">${state.sheet.uploading ? 'Enviando…' : 'Enviar foto'}</label>
@@ -732,10 +836,7 @@ function renderBook(b) {
     <div class="stats3">
       <div><span class="label">Rating</span>${ratingHTML(b)}</div>
       <div><span class="label">Obsession</span>
-        <select class="obs-select" data-field="obsession" aria-label="Obsession level">
-          <option value="">escolher</option>
-          ${OBSESSION.map((o) => `<option value="${o.id}" ${b.obsession === o.id ? 'selected' : ''}>${o.label}</option>`).join('')}
-        </select></div>
+        ${ddHTML('obsession', b.obsession, [...OBSESSION, { id: '', label: 'Sem nível' }], { cls: 'dd-obs', label: 'Obsession level' })}</div>
       <div><span class="label">Spicy</span>${spicyHTML(b)}</div>
     </div>
 
@@ -747,13 +848,13 @@ function renderBook(b) {
     <div class="rows">
       <div class="row"><label for="f-title">Título</label><div class="ctrl"><input id="f-title" type="text" data-field="title" value="${esc(b.title)}" autocomplete="off"></div></div>
       <div class="row"><label for="f-author">Autora</label><div class="ctrl"><input id="f-author" type="text" data-field="author" value="${esc(b.author || '')}" autocomplete="off"></div></div>
-      <div class="row"><label for="f-status">Status</label><div class="ctrl">
-        <select id="f-status" data-field="status">${STATUSES.map((s) => `<option value="${s.id}" ${b.status === s.id ? 'selected' : ''}>${s.one}</option>`).join('')}</select></div></div>
+      <div class="row"><span class="label-plain">Status</span><div class="ctrl">
+        ${ddHTML('status', b.status, STATUSES.map((s) => ({ id: s.id, label: s.one })), { cls: 'dd-right', label: 'Status' })}</div></div>
       ${b.status === 'lendo' ? `<div class="row"><label for="f-cur">Página atual</label><div class="ctrl"><input id="f-cur" class="num" type="number" inputmode="numeric" min="0" data-field="current_page" value="${b.current_page ?? ''}"></div></div>` : ''}
       <div class="row"><label for="f-pages">Páginas</label><div class="ctrl"><input id="f-pages" class="num" type="number" inputmode="numeric" min="0" data-field="pages" value="${b.pages ?? ''}"></div></div>
       ${b.status === 'lido' ? `<div class="row"><label for="f-fim">Terminei em</label><div class="ctrl"><input id="f-fim" type="date" data-field="finished_at" value="${b.finished_at || ''}"></div></div>` : ''}
-      <div class="row"><label for="f-lang">Idioma</label><div class="ctrl">
-        <select id="f-lang" data-field="language"><option value="">—</option><option value="pt" ${b.language === 'pt' ? 'selected' : ''}>Português</option><option value="en" ${b.language === 'en' ? 'selected' : ''}>Inglês</option></select></div></div>
+      <div class="row"><span class="label-plain">Idioma</span><div class="ctrl">
+        ${ddHTML('language', b.language, LANGUAGES, { placeholder: '—', cls: 'dd-right', label: 'Idioma' })}</div></div>
       <div class="row"><label for="f-series">Série</label><div class="ctrl"><input id="f-series" type="text" data-field="series" placeholder="nome da série" value="${esc(b.series || '')}"></div></div>
       <div class="row"><label for="f-pos">Livro nº</label><div class="ctrl"><input id="f-pos" class="num" type="number" inputmode="decimal" step="0.5" min="0" data-field="series_position" value="${b.series_position ?? ''}"></div></div>
       <div class="row stack"><span class="label-plain label">Gênero</span>
@@ -784,16 +885,16 @@ function renderAdd() {
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Adicionar livro"><div class="sheet-inner">
     <div class="sheet-top">
       <button class="iconbtn back" data-action="close" aria-label="Fechar">${ic.back}</button>
-      <span class="eyebrow">Google Books</span>
+      <span class="eyebrow">Google Books · Open Library</span>
     </div>
     <h2 class="sheet-title">Adicionar livro</h2>
 
     ${s.manual ? `
       <form id="manualForm" class="picked" novalidate>
-        <div class="field"><label for="m-title">Título</label><input class="input" id="m-title" name="title" required></div>
-        <div class="field"><label for="m-author">Autora</label><input class="input" id="m-author" name="author"></div>
-        <div class="field"><label for="m-pages">Páginas</label><input class="input" id="m-pages" name="pages" type="number" inputmode="numeric" min="0"></div>
-        <div class="field"><label for="m-status">Status</label><select class="input" id="m-status" name="status">${STATUSES.map((x) => `<option value="${x.id}" ${x.id === 'tbr' ? 'selected' : ''}>${x.one}</option>`).join('')}</select></div>
+        <div class="field"><label for="m-title">Título</label><input class="input" id="m-title" name="title" required value="${esc(s.mTitle || '')}"></div>
+        <div class="field"><label for="m-author">Autora</label><input class="input" id="m-author" name="author" value="${esc(s.mAuthor || '')}"></div>
+        <div class="field"><label for="m-pages">Páginas</label><input class="input" id="m-pages" name="pages" type="number" inputmode="numeric" min="0" value="${esc(s.mPages || '')}"></div>
+        <div class="field"><span class="label">Status</span>${ddHTML('m-status', s.mStatus || 'tbr', STATUSES.map((x) => ({ id: x.id, label: x.one })), { cls: 'dd-field', label: 'Status' })}</div>
         <button class="btn primary" type="submit">Adicionar à Library</button>
       </form>
       <button class="linkbtn" data-action="manual-off">Voltar para a busca</button>
@@ -816,10 +917,10 @@ function renderAdd() {
           <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
             <span class="serif" style="font-weight:600;font-size:20px;line-height:1.1">${esc(picked.title)}</span>
             <span class="hint">${esc(picked.author)}${picked.pages ? ` · ${picked.pages} págs.` : ''}</span>
+            ${picked.cover ? `<span class="cover-src">Capa: ${resultSource(picked)}</span>` : ''}
           </div>
         </div>
-        <div class="field"><label for="p-status">Entra como</label>
-          <select class="input" id="p-status">${STATUSES.map((x) => `<option value="${x.id}" ${x.id === 'tbr' ? 'selected' : ''}>${x.one}</option>`).join('')}</select></div>
+        <div class="field"><span class="label">Entra como</span>${ddHTML('p-status', s.pStatus || 'tbr', STATUSES.map((x) => ({ id: x.id, label: x.one })), { cls: 'dd-field', label: 'Entra como' })}</div>
         <button class="btn primary" data-action="add-confirm">Adicionar à Library</button>
       </div>` : ''}
 
@@ -834,6 +935,7 @@ function renderAdd() {
             <span class="rt">${esc(r.title)}</span>
             <span class="ra">${esc(r.author || 'Autora desconhecida')}</span>
             <span class="rm">${[r.language === 'pt' ? 'Português' : r.language === 'en' ? 'Inglês' : '', r.pages ? `${r.pages} págs.` : '', r.year].filter(Boolean).join(' · ')}</span>
+            <span class="cover-src">${r.cover ? 'Capa: ' : 'Sem capa · '}${resultSource(r)}</span>
           </span>
         </button>`).join('')}
     </div>
@@ -866,12 +968,39 @@ function renderCover(b) {
     <div class="covergrid">
       ${opts.map((r) => `<button data-action="cover-pick" data-gid="${esc(r.gid)}" aria-pressed="${b.google_books_id === r.gid}" aria-label="${esc(r.title)} ${r.year || ''}">
         <img src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer">
-        ${s.mode === 'author' ? `<span class="cover-caption">${esc(r.title)}</span>` : ''}</button>`).join('')}
+        ${s.mode === 'author' ? `<span class="cover-caption">${esc(r.title)}</span>` : ''}
+        <span class="cover-src">${resultSource(r)}</span></button>`).join('')}
+    </div>
+  </div></div>`;
+}
+
+/* ---------------- render: temas ---------------- */
+function renderThemes() {
+  return `
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Temas"><div class="sheet-inner">
+    <div class="sheet-top">
+      <button class="iconbtn back" data-action="close" aria-label="Voltar para a Library">${ic.back}</button>
+      <span class="eyebrow">Fica salvo na sua conta</span>
+    </div>
+    <h2 class="sheet-title">Temas</h2>
+    <div class="theme-list">
+      ${THEMES.map((t) => {
+        ensureFont(t);
+        const on = state.theme === t.id;
+        return `<button class="theme-card" data-action="theme-pick" data-value="${t.id}" aria-pressed="${on}" style="background:${t.bg};color:${t.ink}">
+          <span class="tc-title" style="font-family:${t.font};font-style:${t.style};font-weight:${t.weight};${t.caps ? 'text-transform:uppercase;letter-spacing:1px;' : ''}">Library</span>
+          <span class="tc-spines" aria-hidden="true">${t.spines.map((c) => `<i style="background:${c}"></i>`).join('')}<b style="background:${t.accent}"></b></span>
+          <span class="tc-name">${t.name}</span>
+          <span class="tc-note" style="color:${t.meta}">${t.note}</span>
+          ${on ? `<span class="tc-check" style="background:${t.accent};color:${t.bg}">${ic.check}</span>` : ''}
+        </button>`;
+      }).join('')}
     </div>
   </div></div>`;
 }
 
 /* ---------------- render principal ---------------- */
+let lastSheetKey = '';
 function render() {
   if (state.recovery) {
     // Não apaga a senha que está sendo digitada se outra parte do app pedir um redesenho.
@@ -888,11 +1017,16 @@ function render() {
   if (state.sheet?.kind === 'book') { const b = byId(state.sheet.id); sheet = b ? renderBook(b) : ''; }
   else if (state.sheet?.kind === 'add') sheet = renderAdd();
   else if (state.sheet?.kind === 'cover') { const b = byId(state.sheet.id); sheet = b ? renderCover(b) : ''; }
+  else if (state.sheet?.kind === 'themes') sheet = renderThemes();
 
   app.innerHTML = `<div class="shell" ${sheet ? 'aria-hidden="true"' : ''}>${renderLibrary()}</div>${renderNav()}${sheet}`;
   document.body.style.overflow = sheet ? 'hidden' : '';
 
   const sh = document.querySelector('.sheet');
+  // A animação de entrada só roda quando uma tela nova abre, não a cada alteração.
+  const sheetKey = state.sheet ? `${state.sheet.kind}:${state.sheet.id || ''}` : '';
+  if (sh && sheetKey !== lastSheetKey) sh.classList.add('enter');
+  lastSheetKey = sheetKey;
   if (sh && sheetScroll != null && state.sheet?.keepScroll) sh.scrollTop = sheetScroll;
   if (focusId) {
     const el = document.getElementById(focusId);
@@ -924,7 +1058,40 @@ async function runCoverSearch(q) {
   if (state.sheet === s) { s.loading = false; render(); }
 }
 
+// Grava um campo do livro com as regras automáticas de status.
+function setField(b, field, v) {
+  const before = { status: b.status, finished_at: b.finished_at, current_page: b.current_page };
+  const patch = { [field]: v };
+  const today = new Date().toISOString().slice(0, 10);
+  if (field === 'status' && v === 'lido' && !b.finished_at) patch.finished_at = today;
+  if (field === 'status' && v === 'lido' && b.pages) patch.current_page = b.pages;
+  if (field === 'status' && v === 'lendo' && b.current_page == null) patch.current_page = 0;
+  // Chegou na última página: o livro vira "Lido".
+  const cur = field === 'current_page' ? v : b.current_page;
+  const total = field === 'pages' ? v : b.pages;
+  const finishedNow = b.status === 'lendo' && (field === 'current_page' || field === 'pages') && total && cur != null && cur >= total;
+  if (finishedNow) {
+    patch.status = 'lido';
+    patch.current_page = total;
+    if (!b.finished_at) patch.finished_at = today;
+  }
+  if (state.sheet) state.sheet.keepScroll = true;
+  updateBook(b.id, patch, { quiet: finishedNow });
+  if (finishedNow) {
+    toast('Livro terminado! Foi para Lidos.', false, () => {
+      if (state.sheet) state.sheet.keepScroll = true;
+      updateBook(b.id, before, { quiet: true });
+    });
+  }
+}
+
 document.addEventListener('click', async (e) => {
+  // Clique fora de um menu suspenso aberto fecha o menu.
+  if (state.dd && !e.target.closest('.dd')) {
+    state.dd = null;
+    if (state.sheet) state.sheet.keepScroll = true;
+    render();
+  }
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const a = el.dataset.action;
@@ -932,6 +1099,39 @@ document.addEventListener('click', async (e) => {
   const b = sheet?.id ? byId(sheet.id) : null;
 
   switch (a) {
+    case 'dd-open': {
+      const k = el.dataset.dd;
+      state.dd = state.dd === k ? null : k;
+      if (sheet) sheet.keepScroll = true;
+      render();
+      const menu = document.querySelector('.dd-menu');
+      menu?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      menu?.querySelector('[aria-selected="true"], .dd-opt')?.focus({ preventScroll: true });
+      break;
+    }
+    case 'dd-pick': {
+      const k = el.dataset.dd;
+      const v = el.dataset.value || null;
+      state.dd = null;
+      if (sheet) sheet.keepScroll = true;
+      if (k === 'p-status') { sheet.pStatus = v; render(); break; }
+      if (k === 'm-status') { sheet.mStatus = v; render(); break; }
+      if (b && ['obsession', 'status', 'language'].includes(k)) setField(b, k, v);
+      else render();
+      break;
+    }
+    case 'toast-undo': {
+      const fn = toastUndo;
+      toastUndo = null;
+      toastEl.hidden = true;
+      if (fn) fn();
+      break;
+    }
+    case 'themes':
+      state.sheet = { kind: 'themes' }; render(); document.querySelector('.sheet')?.scrollTo(0, 0); break;
+    case 'theme-pick':
+      if (sheet) sheet.keepScroll = true;
+      chooseTheme(el.dataset.value); break;
     case 'auth-mode': {
       const em = document.getElementById('email')?.value;
       if (em) state.authEmail = em.trim();
@@ -973,7 +1173,7 @@ document.addEventListener('click', async (e) => {
       sheet.picked = sheet.results.find((r) => r.gid === el.dataset.gid); sheet.keepScroll = true; render(); document.querySelector('.picked')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); break;
     case 'add-confirm': {
       const p = sheet.picked;
-      const status = document.getElementById('p-status').value;
+      const status = sheet.pStatus || 'tbr';
       el.disabled = true;
       const row = await insertBook({ title: p.title, author: p.author || null, pages: p.pages, language: p.language, cover_url: p.cover, google_books_id: p.gid, status, current_page: status === 'lendo' ? 0 : null });
       if (row) {
@@ -986,13 +1186,17 @@ document.addEventListener('click', async (e) => {
     case 'manual-on': sheet.manual = true; render(); document.getElementById('m-title')?.focus(); break;
     case 'manual-off': sheet.manual = false; render(); break;
     case 'rate': {
+      // Mantém a escala atual (estrelas ou brilhos); tocar de novo na mesma nota limpa.
       const v = Number(el.dataset.value);
       sheet.keepScroll = true;
       updateBook(b.id, { rating: b.rating === v ? null : v }); break;
     }
-    case 'sparkle':
+    case 'rate-kind': {
+      const sp = el.dataset.value === 'sparkle';
+      if (!!b.sparkle === sp) break;
       sheet.keepScroll = true;
-      updateBook(b.id, { rating: b.rating === 6 ? 5 : 6 }); break;
+      updateBook(b.id, { sparkle: sp }); break;
+    }
     case 'spicy': {
       const v = Number(el.dataset.value);
       sheet.keepScroll = true;
@@ -1031,21 +1235,22 @@ document.addEventListener('click', async (e) => {
     case 'cover-pick': {
       const r = sheet.results.find((x) => x.gid === el.dataset.gid);
       const oldCover = b.cover_url;
-      b.cover_url = r.cover; b.google_books_id = r.gid;
+      const oldSource = b.cover_source_url;
+      b.cover_url = r.cover; b.google_books_id = r.gid; b.cover_source_url = r.cover;
       state.sheet = { kind: 'book', id: b.id }; render();
       // A função copia a imagem para o Storage e já grava o novo endereço no livro.
       if (await cacheCover(b.id, r.cover)) {
         await sb.from('books').update({ google_books_id: r.gid }).eq('id', b.id);
         toast('Capa trocada');
       } else {
-        const { error } = await sb.from('books').update({ cover_url: r.cover, google_books_id: r.gid }).eq('id', b.id);
-        if (error) { b.cover_url = oldCover; toast('Não consegui trocar a capa.', true); } else toast('Capa trocada');
+        const { error } = await sb.from('books').update({ cover_url: r.cover, google_books_id: r.gid, cover_source_url: r.cover }).eq('id', b.id);
+        if (error) { b.cover_url = oldCover; b.cover_source_url = oldSource; toast('Não consegui trocar a capa.', true); } else toast('Capa trocada');
       }
       render(); break;
     }
     case 'cover-remove':
       sheet.keepScroll = true;
-      updateBook(b.id, { cover_url: null, google_books_id: null }); break;
+      updateBook(b.id, { cover_url: null, google_books_id: null, cover_source_url: null }); break;
     case 'back-to-book':
       state.sheet = { kind: 'book', id: sheet.id }; render(); break;
     case 'delete': sheet.confirmDelete = true; sheet.keepScroll = true; render(); break;
@@ -1062,7 +1267,7 @@ document.addEventListener('submit', async (e) => {
     const f = e.target;
     const title = f.title.value.trim();
     if (!title) { toast('Escreva pelo menos o título.', true); return; }
-    const status = f.status.value;
+    const status = state.sheet.mStatus || 'tbr';
     const row = await insertBook({ title, author: f.author.value.trim() || null, pages: f.pages.value ? Number(f.pages.value) : null, status, current_page: status === 'lendo' ? 0 : null });
     if (row) { state.sheet = { kind: 'book', id: row.id }; toast('Adicionado à Library'); render(); }
   }
@@ -1078,6 +1283,12 @@ document.addEventListener('input', (e) => {
   }
   if (t.id === 'gq') { clearTimeout(searchTimer); const v = t.value; state.sheet.q = v; searchTimer = setTimeout(() => runAddSearch(v), 450); return; }
   if (t.id === 'cq') { clearTimeout(searchTimer); const v = t.value; searchTimer = setTimeout(() => runCoverSearch(v), 450); return; }
+  // Guarda o que foi digitado no cadastro manual, para não perder ao abrir o menu de status.
+  if (t.form?.id === 'manualForm' && state.sheet) {
+    const k = { title: 'mTitle', author: 'mAuthor', pages: 'mPages' }[t.name];
+    if (k) state.sheet[k] = t.value;
+    return;
+  }
   if (t.id === 'why') {
     const b = byId(state.sheet.id);
     updateBook(b.id, { why_it_marked: t.value || null }, { rerender: false, quiet: true });
@@ -1101,12 +1312,7 @@ document.addEventListener('change', (e) => {
   else if (t.type === 'number') v = t.value === '' ? null : Number(t.value);
   else v = t.value.trim() === '' ? null : t.value.trim();
   if (field === 'title' && !v) { toast('O título não pode ficar vazio.', true); t.value = b.title; return; }
-  const patch = { [field]: v };
-  if (field === 'status' && v === 'lido' && !b.finished_at) patch.finished_at = new Date().toISOString().slice(0, 10);
-  if (field === 'status' && v === 'lido' && b.pages) patch.current_page = b.pages;
-  if (field === 'status' && v === 'lendo' && b.current_page == null) patch.current_page = 0;
-  state.sheet.keepScroll = true;
-  updateBook(b.id, patch);
+  setField(b, field, v);
 });
 
 document.addEventListener('keydown', (e) => {
@@ -1127,14 +1333,48 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     document.getElementById('coverFile')?.click();
   }
+  if (e.key === 'Escape' && state.dd) {
+    state.dd = null;
+    if (state.sheet) state.sheet.keepScroll = true;
+    render();
+    return;
+  }
   if (e.key === 'Escape' && state.sheet) { state.sheet = null; render(); }
 });
 
+/* ---------------- atualização sem cache ---------------- */
+// Quando eu publico uma versão nova, o app percebe e recarrega sozinho com os arquivos novos.
+const APP_VERSION = '2026.10.23-1';
+async function checkVersion() {
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const { v } = await res.json();
+    if (!v || v === APP_VERSION) return;
+    // Evita recarregar em círculo se o navegador insistir na versão antiga.
+    let tried = null;
+    try { tried = sessionStorage.getItem('bo.reloadedFor'); sessionStorage.setItem('bo.reloadedFor', v); } catch { /* sem armazenamento */ }
+    if (tried === v) return;
+    if (state.sheet && document.activeElement?.matches?.('input, textarea')) return; // não interrompe quem está digitando
+    location.replace(`${location.pathname}?v=${encodeURIComponent(v)}${location.hash}`);
+  } catch { /* sem internet: segue com a versão atual */ }
+}
+if (new URLSearchParams(location.search).has('v')) history.replaceState(null, '', location.pathname + location.hash);
+checkVersion();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
+
 /* ---------------- início ---------------- */
+let savedTheme = 'editorial';
+try { savedTheme = localStorage.getItem(THEME_KEY) || 'editorial'; } catch { /* sem armazenamento */ }
+applyTheme(savedTheme);
+
 sb.auth.onAuthStateChange((event, session) => {
   const was = state.session?.user?.id;
   state.session = session;
   if (event === 'PASSWORD_RECOVERY') { state.recovery = true; state.authMsg = null; renderRecovery(); return; }
   if (!session) { state.books = []; state.loaded = false; state.sheet = null; renderAuth(); return; }
+  // O tema salvo na conta vale em todos os aparelhos.
+  const accountTheme = session.user.user_metadata?.theme;
+  if (accountTheme && accountTheme !== state.theme) applyTheme(accountTheme);
   if (was !== session.user.id) { state.authMsg = null; render(); loadBooks(); }
 });

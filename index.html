@@ -11,13 +11,17 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Booked">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <script>
+    // Aplica o tema salvo antes de desenhar a página, para não piscar o tema padrão.
+    try { var t = localStorage.getItem('bo.theme'); if (t && t !== 'editorial') document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500;1,600&family=Jost:wght@300;400;500&display=swap">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2026.10.23-1">
 </head>
 <body>
   <div id="app" aria-live="polite">
@@ -26,6 +30,6 @@
     </div>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=2026.10.23-1"></script>
 </body>
 </html>
