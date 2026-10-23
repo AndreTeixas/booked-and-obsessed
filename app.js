@@ -287,6 +287,52 @@ async function cacheCover(bookId, url) {
   } catch { return false; }
 }
 
+// Reduz a foto para no máximo 900px de altura e salva como JPEG, para ficar leve.
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 900 / img.height, 600 / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('blob'))), 'image/jpeg', 0.86);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+    img.src = url;
+  });
+}
+
+async function uploadOwnCover(b, file) {
+  if (!file.type.startsWith('image/')) { toast('Escolha uma imagem (foto ou print da capa).', true); return; }
+  state.sheet.uploading = true; state.sheet.keepScroll = true; render();
+  try {
+    const blob = await shrinkImage(file);
+    const uid = state.session.user.id;
+    const path = `${uid}/${b.id}-foto-${Date.now()}.jpg`;
+    const up = await sb.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' });
+    if (up.error) throw up.error;
+    const publicUrl = sb.storage.from('covers').getPublicUrl(path).data.publicUrl;
+    const old = b.cover_url;
+    const { error } = await sb.from('books').update({ cover_url: publicUrl, cover_source_url: 'upload', google_books_id: null }).eq('id', b.id);
+    if (error) { await sb.storage.from('covers').remove([path]); throw error; }
+    b.cover_url = publicUrl; b.cover_source_url = 'upload'; b.google_books_id = null;
+    // Apaga a capa anterior guardada para este livro, se havia.
+    if (isStored(old)) {
+      const oldPath = decodeURIComponent(old.split(STORED_MARK)[1] || '');
+      if (oldPath.startsWith(uid + '/')) sb.storage.from('covers').remove([oldPath]);
+    }
+    toast('Capa enviada');
+  } catch {
+    toast('Não consegui enviar a foto. Tente de novo.', true);
+  }
+  if (state.sheet) { state.sheet.uploading = false; state.sheet.keepScroll = true; }
+  render();
+}
+
 let migrating = false;
 async function migrateExternalCovers() {
   if (migrating) return;
@@ -300,19 +346,59 @@ async function migrateExternalCovers() {
 }
 
 /* ---------------- capas em lote ---------------- */
-const TRIED_KEY = 'bo.coverTried.v2';
+// v3: a busca automática mudou, então todos os livros sem capa são procurados de novo.
+const TRIED_KEY = 'bo.coverTried.v3';
 function triedSet() {
   try { return new Set(JSON.parse(localStorage.getItem(TRIED_KEY) || '[]')); } catch { return new Set(); }
 }
 function saveTried(set) {
   try { localStorage.setItem(TRIED_KEY, JSON.stringify([...set])); } catch { /* sem armazenamento local */ }
 }
+// Todos os livros sem capa (é o número que o aviso mostra).
 function missingCovers() {
-  const tried = triedSet();
-  return state.books.filter((b) => !b.cover_url && !tried.has(b.id));
+  return state.books.filter((b) => !b.cover_url);
 }
+// Os que ainda não foram procurados com a busca atual.
+function pendingCovers() {
+  const tried = triedSet();
+  return missingCovers().filter((b) => !tried.has(b.id));
+}
+
+const simpleText = (s) => norm(s).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const mainTitle = (s) => simpleText(String(s || '').split(':')[0]);
+
+// Escolhe, entre os resultados, uma edição do mesmo livro, da mesma autora e no idioma da leitura.
+function pickCover(b, results) {
+  const want = mainTitle(cleanTitle(b.title));
+  const authorLast = simpleText((b.author || '').split(',')[0]).split(' ').pop() || '';
+  return results.find((r) => {
+    if (!r.cover) return false;
+    const got = mainTitle(r.title);
+    if (!got || !(got === want || got.startsWith(want) || want.startsWith(got))) return false;
+    if (authorLast && !simpleText(r.author).includes(authorLast)) return false;
+    if (b.language && r.language !== b.language) return false;
+    return true;
+  }) || null;
+}
+
+// Busca em texto livre (o filtro de título do Google falha para várias edições brasileiras).
+async function findCover(b) {
+  const q = `${cleanTitle(b.title)} ${(b.author || '').split(',')[0]}`.trim();
+  let gOk = false;
+  let lastErr = null;
+  let hit = null;
+  try {
+    hit = pickCover(b, await gbSearch(q, { max: 20 }));
+    gOk = true;
+  } catch (err) { lastErr = err; }
+  if (!hit) {
+    try { hit = pickCover(b, await olSearch(q, { max: 20 })); } catch (err) { lastErr = lastErr || err; }
+  }
+  return { hit, gOk, lastErr };
+}
+
 async function fetchMissingCovers() {
-  const list = missingCovers();
+  const list = pendingCovers();
   if (!list.length) return;
   const tried = triedSet();
   state.coverJob = { done: 0, total: list.length, found: 0 };
@@ -321,22 +407,10 @@ async function fetchMissingCovers() {
   let failures = 0;
   for (const b of list) {
     try {
-      const t = cleanTitle(b.title);
-      const author = (b.author || '').split(',')[0];
-      let q = `intitle:${t}`;
-      if (author) q += ` inauthor:${author}`;
-      let hit = null;
-      let gOk = false;
-      try {
-        let items = await gbSearch(q, { lang: b.language || '', max: 10 });
-        gOk = true;
-        if (!items.some((i) => i.cover) && b.language) items = await gbSearch(q, { max: 10 });
-        hit = items.find((i) => i.cover);
-      } catch (err) { lastErr = err; }
-      if (!hit) {
-        const ol = await olSearch(`${t} ${author}`, { max: 10 });
-        hit = ol.find((i) => i.cover);
-      }
+      const res = await findCover(b);
+      const hit = res.hit;
+      const gOk = res.gOk;
+      if (res.lastErr) lastErr = res.lastErr;
       if (hit) {
         b.cover_url = hit.cover;
         b.google_books_id = hit.gid;
@@ -477,6 +551,7 @@ function visibleBooks() {
   const q = norm(state.query);
   let list = state.books;
   if (state.filter.type === 'status') list = list.filter((b) => b.status === state.filter.value);
+  else if (state.filter.type === 'nocover') list = list.filter((b) => !b.cover_url);
   else {
     const c = COLLECTIONS.find((x) => x.id === state.filter.value);
     list = list.filter(c.test);
@@ -535,18 +610,28 @@ function libBodyHTML() {
   const counts = Object.fromEntries(STATUSES.map((s) => [s.id, state.books.filter((b) => b.status === s.id).length]));
   const list = visibleBooks();
   const missing = missingCovers().length;
+  const pending = pendingCovers().length;
   const job = state.coverJob;
   const filterLabel = state.query
     ? `Resultados para “${esc(state.query)}”`
     : state.filter.type === 'status'
       ? STATUSES.find((s) => s.id === state.filter.value).tab
-      : COLLECTIONS.find((c) => c.id === state.filter.value).label;
+      : state.filter.type === 'nocover'
+        ? 'Sem capa'
+        : COLLECTIONS.find((c) => c.id === state.filter.value).label;
+  const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+  const showBtn = state.filter.type === 'nocover'
+    ? ''
+    : '<button class="btn small" data-action="show-nocover">Ver quais</button>';
 
   const banner = job
-    ? `<div class="banner"><p>Buscando capas no Google Books… ${job.done} de ${job.total}</p></div>`
+    ? `<div class="banner"><p>Buscando capas… ${job.done} de ${job.total}</p></div>`
     : missing && total
-      ? `<div class="banner"><p>${missing} ${missing === 1 ? 'livro está' : 'livros estão'} sem capa. Posso buscar no Google Books; você troca as que vierem erradas.</p>
-         <button class="btn small dark" data-action="fetch-covers">Buscar capas</button></div>`
+      ? pending
+        ? `<div class="banner"><p>${plural(missing, 'livro está', 'livros estão')} sem capa. Posso buscar no Google Books e no Open Library; você troca as que vierem erradas.</p>
+           <button class="btn small dark" data-action="fetch-covers">Buscar capas</button></div>`
+        : `<div class="banner"><p>${plural(missing, 'livro está', 'livros estão')} sem capa porque ${missing === 1 ? 'a edição não foi encontrada' : 'as edições não foram encontradas'} no Google Books nem no Open Library. Abra o livro e use “Trocar capa” para buscar pela autora, ou envie uma foto da capa.</p>
+           ${showBtn}</div>`
       : '';
 
   const body = !state.loaded
@@ -630,7 +715,9 @@ function renderBook(b) {
       ${coverHTML(b, 'lg')}
       <div class="covertools">
         <button class="linkbtn" data-action="cover">${b.cover_url ? 'Trocar capa' : 'Buscar capa'}</button>
-        ${b.cover_url ? '<button class="linkbtn" data-action="cover-remove">Usar capa tipográfica</button>' : ''}
+        <label class="linkbtn" for="coverFile" role="button" tabindex="0">${state.sheet.uploading ? 'Enviando…' : 'Enviar foto'}</label>
+        <input id="coverFile" type="file" accept="image/*" hidden>
+        ${b.cover_url ? '<button class="linkbtn" data-action="cover-remove">Usar tipográfica</button>' : ''}
       </div>
       <h1>${esc(cleanTitle(b.title))}</h1>
       <span class="by">${esc(b.author || 'Autora desconhecida')}${b.series ? ` · ${esc(b.series)}${b.series_position ? ', ' + esc(b.series_position) : ''}` : ''}</span>
@@ -861,6 +948,10 @@ document.addEventListener('click', async (e) => {
       render(); break;
     }
     case 'fetch-covers': fetchMissingCovers(); break;
+    case 'show-nocover':
+      state.query = ''; state.filter = { type: 'nocover' }; render();
+      document.querySelector('.section-line')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      break;
     case 'open':
       state.sheet = { kind: 'book', id: el.dataset.id }; render(); document.querySelector('.sheet')?.scrollTo(0, 0); break;
     case 'close':
@@ -995,6 +1086,13 @@ document.addEventListener('input', (e) => {
 
 document.addEventListener('change', (e) => {
   const t = e.target;
+  if (t.id === 'coverFile') {
+    const file = t.files?.[0];
+    const b = state.sheet?.id && byId(state.sheet.id);
+    if (file && b) uploadOwnCover(b, file);
+    t.value = '';
+    return;
+  }
   const field = t.dataset.field;
   if (!field || !state.sheet?.id || field === 'why_it_marked') return;
   const b = byId(state.sheet.id);
@@ -1024,6 +1122,10 @@ document.addEventListener('keydown', (e) => {
     state.sheet.keepScroll = true;
     updateBook(b.id, { [f]: arr });
     setTimeout(() => document.querySelector(`[data-chip="${f}"]`)?.focus(), 0);
+  }
+  if (t.getAttribute?.('for') === 'coverFile' && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault();
+    document.getElementById('coverFile')?.click();
   }
   if (e.key === 'Escape' && state.sheet) { state.sheet = null; render(); }
 });
