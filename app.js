@@ -32,7 +32,7 @@ const LANGUAGES = [
 ];
 const GENRES = ['Romance', 'Romantasia', 'Sports Romance', 'Mafia Romance', 'Dark Romance', 'Cowboy', 'SMUT'];
 const COLLECTIONS = [
-  { id: 'favoritos', label: 'Favoritos', cls: 'c-blush', test: (b) => b.sparkle && b.rating },
+  { id: 'favoritos', label: 'Favoritos', cls: 'c-blush', test: (b) => (b.sparkles || 0) > 0 },
   { id: 'boyfriends', label: 'Book boyfriends', cls: 'c-sage', test: (b) => (b.book_boyfriends || []).length > 0 },
   { id: 'hot', label: 'Mais hot', cls: 'c-peach', test: (b) => (b.spicy || 0) >= 4 },
   { id: 'damage', label: 'Emotional damage', cls: 'c-blush', test: (b) => b.obsession === 'destruiu' },
@@ -669,7 +669,7 @@ function visibleBooks() {
 function cardMeta(b) {
   if (b.status === 'lendo' && b.pages) return `${Math.round(((b.current_page || 0) / b.pages) * 100)}% lido`;
   if (b.obsession) return obsLabel(b.obsession);
-  if (b.sparkle && b.rating) return 'Favorito';
+  if (b.sparkles) return 'Favorito';
   return '';
 }
 
@@ -778,17 +778,14 @@ function renderNav() {
 }
 
 /* ---------------- render: ficha ---------------- */
-// Nota de 1 a 5, em estrelas ou em brilhos (escala própria, acima das estrelas).
+// Duas notas independentes: estrelas (rating) e brilhos (sparkles), de 1 a 5 cada.
 function ratingHTML(b) {
-  const r = b.rating || 0;
-  const sp = !!b.sparkle;
-  const unit = sp ? ['brilho', 'brilhos'] : ['estrela', 'estrelas'];
-  const btns = [1, 2, 3, 4, 5].map((i) => `<button data-action="rate" data-value="${i}" class="${r >= i ? 'on' : 'off'}" aria-label="${i} ${i === 1 ? unit[0] : unit[1]}">${sp ? ic.sparkle : ic.star}</button>`).join('');
-  return `<div class="rating ${sp ? 'is-sparkle' : 'is-star'}">${btns}</div>
-    <div class="kind-toggle" role="group" aria-label="Tipo de nota">
-      <button data-action="rate-kind" data-value="star" aria-pressed="${!sp}">estrelas</button>
-      <button data-action="rate-kind" data-value="sparkle" aria-pressed="${sp}">brilhos</button>
-    </div>`;
+  const row = (field, cls, icon, um, varios) => {
+    const v = b[field] || 0;
+    return `<div class="rating ${cls}" role="group" aria-label="${varios}">${[1, 2, 3, 4, 5].map((i) =>
+      `<button data-action="rate" data-field="${field}" data-value="${i}" class="${v >= i ? 'on' : 'off'}" aria-label="${i} ${i === 1 ? um : varios}" aria-pressed="${v === i}">${icon}</button>`).join('')}</div>`;
+  };
+  return row('rating', 'is-star', ic.star, 'estrela', 'estrelas') + row('sparkles', 'is-sparkle', ic.sparkle, 'brilho', 'brilhos');
 }
 
 function spicyHTML(b) {
@@ -1186,16 +1183,11 @@ document.addEventListener('click', async (e) => {
     case 'manual-on': sheet.manual = true; render(); document.getElementById('m-title')?.focus(); break;
     case 'manual-off': sheet.manual = false; render(); break;
     case 'rate': {
-      // Mantém a escala atual (estrelas ou brilhos); tocar de novo na mesma nota limpa.
+      // Estrelas e brilhos mudam cada um sozinho; tocar de novo na mesma nota limpa aquela linha.
+      const f = el.dataset.field === 'sparkles' ? 'sparkles' : 'rating';
       const v = Number(el.dataset.value);
       sheet.keepScroll = true;
-      updateBook(b.id, { rating: b.rating === v ? null : v }); break;
-    }
-    case 'rate-kind': {
-      const sp = el.dataset.value === 'sparkle';
-      if (!!b.sparkle === sp) break;
-      sheet.keepScroll = true;
-      updateBook(b.id, { sparkle: sp }); break;
+      updateBook(b.id, { [f]: b[f] === v ? null : v }); break;
     }
     case 'spicy': {
       const v = Number(el.dataset.value);
@@ -1344,7 +1336,7 @@ document.addEventListener('keydown', (e) => {
 
 /* ---------------- atualização sem cache ---------------- */
 // Quando eu publico uma versão nova, o app percebe e recarrega sozinho com os arquivos novos.
-const APP_VERSION = '2026.10.23-1';
+const APP_VERSION = '2026.10.23-2';
 async function checkVersion() {
   try {
     const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });

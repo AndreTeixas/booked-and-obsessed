@@ -391,9 +391,9 @@ img { max-width: 100%; display: block; }
 .rating.is-star button.on { color: var(--star); }
 .rating.is-sparkle button.on { color: var(--sparkle); }
 .rating button.off, .spicy button.off { color: var(--off); }
-.kind-toggle { display: flex; gap: 2px; }
-.kind-toggle button { border: none; background: none; font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); padding: 4px 5px; border-radius: 8px; }
-.kind-toggle button[aria-pressed="true"] { color: var(--ink); font-weight: 500; background: var(--blush); }
+.stats3 > div:first-child { gap: 2px; }
+.stats3 > div:first-child .label { margin-bottom: 2px; }
+.rating.is-sparkle { margin-top: -6px; }
 
 /* menus suspensos desenhados pelo app */
 .dd { position: relative; max-width: 100%; }
