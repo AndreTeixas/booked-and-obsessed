@@ -511,6 +511,100 @@ img { max-width: 100%; display: block; }
 .tc-note { font-size: 11px; line-height: 1.25; }
 .tc-check { position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; border-radius: 12px; display: grid; place-items: center; }
 
+/* ---------- Minha Estante ----------
+   As prateleiras são desenhadas pelo fundo do contêiner: cada linha de livros tem 130px
+   e a tábua ocupa os 14px seguintes, então a estante cresce sozinha em qualquer largura. */
+.shelf-head { display: flex; flex-direction: column; gap: 10px; }
+.shelf-title-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.shelf-title-row h1 { margin: 0; font-size: calc(58px * var(--display-scale)); line-height: 0.9; }
+.year-chips { display: flex; gap: 6px; flex-wrap: wrap; padding-bottom: 4px; }
+.shelf-progress { display: flex; flex-direction: column; gap: 8px; }
+.shelf-sum { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 14px; }
+.shelf-sum b { font-weight: 500; }
+.linkbtn.small { font-size: 13px; padding: 4px 0; }
+.shelf-progress .bar { height: 3px; border-radius: 2px; background: var(--line); }
+.shelf-progress .bar div { height: 3px; border-radius: 2px; background: var(--accent); }
+.goal-edit { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: var(--r-card); background: var(--blush); }
+.stepper { display: flex; align-items: center; gap: 6px; }
+.stepper .step { width: 40px; height: 40px; border: 1px solid var(--line); background: var(--surface); font-size: 20px; line-height: 1; }
+.stepper input { width: 64px; height: 40px; text-align: center; border: none; border-bottom: 1px solid var(--ink); background: transparent; font-size: 20px; font-variant-numeric: lining-nums tabular-nums; }
+.stepper input:focus { outline: none; border-bottom-color: var(--accent); }
+.goal-actions { display: flex; gap: 8px; margin-left: auto; }
+.segmented.small { align-self: flex-start; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.segmented.small button { height: 32px; min-width: 0; padding: 0 12px; font-size: 13px; }
+.hint.center { text-align: center; }
+
+.bookcase {
+  --row: 130px; --plank: 14px;
+  --wood-hi: #A06E4A; --wood: #8A5A3B; --wood-lo: #6E4529;
+  --panel: color-mix(in srgb, var(--bg) 50%, #D6BC9A);
+  --bookend: #5A3A26;
+  border-radius: 6px;
+}
+.bookcase.bc-classica { border: 12px solid var(--wood); border-bottom-width: 0; background: var(--panel); padding-top: 10px; box-shadow: 0 18px 30px -18px var(--shadow); }
+.bookcase.bc-luzinhas {
+  --wood-hi: #5A4032; --wood: #4A3428; --wood-lo: #3B2A22; --bookend: #5A4032;
+  --panel: color-mix(in srgb, var(--bg) 45%, #241A1C);
+  border: 12px solid var(--wood-lo); border-bottom-width: 0; background: var(--panel); padding-top: 12px; box-shadow: 0 18px 30px -16px rgba(0, 0, 0, 0.7);
+}
+.bookcase.bc-flutuante {
+  --wood-hi: #EEE1CE; --wood: #E2D1B8; --wood-lo: #D3BEA1; --plank: 9px; --bookend: #D3BEA1;
+  --panel: transparent;
+}
+.shelves {
+  display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 3px; row-gap: var(--plank);
+  padding: 0 10px var(--plank);
+  background-image: repeating-linear-gradient(180deg,
+    transparent 0 var(--row),
+    var(--wood-hi) var(--row) calc(var(--row) + 2px),
+    var(--wood) calc(var(--row) + 2px) calc(var(--row) + var(--plank) - 3px),
+    var(--wood-lo) calc(var(--row) + var(--plank) - 3px) calc(var(--row) + var(--plank)));
+}
+.bc-classica .shelves, .bc-luzinhas .shelves { margin: 0 -12px; padding-left: 22px; padding-right: 22px; }
+.bc-flutuante .shelves { row-gap: calc(var(--plank) + 16px); background-image: repeating-linear-gradient(180deg,
+    transparent 0 var(--row), var(--wood-hi) var(--row) calc(var(--row) + 2px), var(--wood) calc(var(--row) + 2px) calc(var(--row) + var(--plank)),
+    transparent calc(var(--row) + var(--plank)) calc(var(--row) + var(--plank) + 16px)); }
+/* Cordão de luzinhas no alto de cada prateleira. */
+.bc-luzinhas .shelves {
+  background-image:
+    radial-gradient(circle at 50% 8px, #FFE3A3 0 2.5px, rgba(255, 200, 110, 0.45) 3px, transparent 9px),
+    repeating-linear-gradient(180deg,
+      transparent 0 var(--row),
+      var(--wood-hi) var(--row) calc(var(--row) + 2px),
+      var(--wood) calc(var(--row) + 2px) calc(var(--row) + var(--plank) - 3px),
+      var(--wood-lo) calc(var(--row) + var(--plank) - 3px) calc(var(--row) + var(--plank)));
+  background-size: 38px calc(var(--row) + var(--plank)), auto;
+  background-repeat: repeat, repeat;
+}
+.slot { height: var(--row); display: flex; align-items: flex-end; flex: none; }
+.slot.lean { margin-left: 11px; }
+.slot.lean .spine { transform: rotate(var(--lean)); transform-origin: bottom left; }
+.slot.deco { padding: 0 3px; }
+.spine {
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  border: none; border-radius: 2px 2px 1px 1px; padding: 8px 0;
+  box-shadow: inset -2px 0 0 rgba(0, 0, 0, 0.14), inset 2px 0 0 rgba(255, 255, 255, 0.1);
+  transition: transform 0.15s ease;
+}
+.spine span {
+  writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 100%;
+  font-family: var(--serif); font-style: italic; font-size: 11px; line-height: 1;
+}
+.spine:hover, .spine:focus-visible { transform: translateY(-4px); }
+.slot.lean .spine:hover, .slot.lean .spine:focus-visible { transform: rotate(var(--lean)) translateY(-4px); }
+.face { position: relative; width: 58px; border: none; background: none; padding: 0; margin: 0 4px; transform: rotate(var(--tilt)); transform-origin: bottom center; }
+.face .cover { width: 58px; box-shadow: 0 8px 14px -8px rgba(0, 0, 0, 0.55); }
+.face .cover .typo { padding: 6px 5px; }
+.face .cover .typo .ct { font-size: 11px; overflow-wrap: normal; hyphens: auto; -webkit-hyphens: auto; }
+.face .cover .typo .ca { font-size: 5.5px; }
+.face-spark { position: absolute; top: -7px; right: -7px; color: var(--sparkle); line-height: 0; }
+.face-spark svg { width: 16px; height: 16px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
+.ghost { display: block; width: 18px; border: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent); border-bottom: none; border-radius: 2px 2px 0 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .slot.new { animation: shelf-in 0.7s cubic-bezier(.2, .9, .3, 1.2) both; }
+  @keyframes shelf-in { from { opacity: 0; transform: translateY(-40px) rotate(-6deg); } to { opacity: 1; transform: none; } }
+}
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%);

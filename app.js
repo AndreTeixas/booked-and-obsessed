@@ -127,6 +127,9 @@ const state = {
   sheet: null, // { kind: 'book'|'add'|'cover'|'themes', id?, ... }
   dd: null, // menu suspenso aberto
   theme: 'editorial',
+  view: 'library', // 'library' | 'shelf'
+  shelfYear: null,
+  goalEdit: null, // { value } enquanto edita a meta
   authMode: 'login',
   authMsg: null,
   coverJob: null, // { done, total }
@@ -769,12 +772,203 @@ function libBodyHTML() {
 }
 
 function renderNav() {
+  const item = (view, label) => `<button class="nav-item" data-action="nav" data-value="${view}" ${state.view === view ? 'aria-current="page"' : ''}>${label}<span class="dot"></span></button>`;
   return `<nav class="nav" aria-label="Navegação"><div class="nav-inner">
-    <button class="nav-item" disabled>Início<span class="soon">em breve</span></button>
-    <button class="nav-item" aria-current="page">Library<span class="dot"></span></button>
+    ${item('shelf', 'Minha Estante')}
+    ${item('library', 'Library')}
     <button class="nav-item" disabled>Séries<span class="soon">em breve</span></button>
     <button class="nav-item" disabled>Stats<span class="soon">em breve</span></button>
   </div></nav>`;
+}
+
+/* ---------------- Minha Estante ---------------- */
+const DEFAULT_GOAL = 50;
+const SHELF_STYLES = [
+  { id: 'classica', label: 'Clássica' },
+  { id: 'flutuante', label: 'Flutuante' },
+  { id: 'luzinhas', label: 'Luzinhas' },
+];
+const DARK_THEMES = ['noite', 'lua', 'famiglia', 'sombra'];
+const meta = () => state.session?.user?.user_metadata || {};
+const thisYear = () => new Date().getFullYear();
+const bookYear = (b) => Number((b.finished_at || b.created_at || '').slice(0, 4)) || thisYear();
+function goalFor(year) {
+  const g = meta().goals?.[year];
+  return Number.isFinite(g) && g > 0 ? g : DEFAULT_GOAL;
+}
+function shelfStyle() {
+  const s = meta().shelfStyle;
+  if (SHELF_STYLES.some((x) => x.id === s)) return s;
+  const dark = DARK_THEMES.includes(state.theme) || (state.theme === 'editorial' && matchMedia('(prefers-color-scheme: dark)').matches);
+  return dark ? 'luzinhas' : 'classica';
+}
+async function saveMeta(patch) {
+  const before = { ...meta() };
+  if (state.session?.user) state.session.user.user_metadata = { ...before, ...patch };
+  render();
+  const { error } = await sb.auth.updateUser({ data: patch });
+  if (error) {
+    state.session.user.user_metadata = before;
+    render();
+    toast('Não consegui salvar na sua conta. Tente de novo.', true);
+    return false;
+  }
+  return true;
+}
+
+// Cor da lombada: a cor predominante da capa, calculada uma vez e guardada.
+const SPINE_KEY = 'bo.spineColors';
+let spineCache = {};
+try { spineCache = JSON.parse(localStorage.getItem(SPINE_KEY) || '{}'); } catch { spineCache = {}; }
+const spineInk = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 150 ? '#2B2326' : '#F6EBDD';
+};
+function coverColor(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = 12; c.height = 18;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, 12, 18);
+        const d = ctx.getImageData(0, 0, 12, 18).data;
+        let r = 0, g = 0, bl = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; bl += d[i + 2]; n++; }
+        r /= n; g /= n; bl /= n;
+        // Deixa a cor com cara de lombada: nem clara nem escura demais.
+        const max = Math.max(r, g, bl);
+        const k = max > 175 ? 175 / max : max < 45 ? 45 / Math.max(max, 1) : 1;
+        const hex = '#' + [r, g, bl].map((x) => Math.round(Math.min(255, x * k)).toString(16).padStart(2, '0')).join('');
+        resolve(hex);
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+let paintingSpines = false;
+async function paintSpines() {
+  if (paintingSpines) return;
+  paintingSpines = true;
+  const els = [...document.querySelectorAll('.spine[data-cover]')].filter((el) => !spineCache[el.dataset.cover]);
+  for (const el of els) {
+    const url = el.dataset.cover;
+    if (spineCache[url] === undefined) {
+      const hex = await coverColor(url);
+      spineCache[url] = hex || '';
+      try { localStorage.setItem(SPINE_KEY, JSON.stringify(spineCache)); } catch { /* sem armazenamento */ }
+    }
+    const hex = spineCache[url];
+    if (hex) document.querySelectorAll(`.spine[data-cover="${CSS.escape(url)}"]`).forEach((s) => { s.style.background = hex; s.style.color = spineInk(hex); });
+  }
+  paintingSpines = false;
+}
+
+const hashOf = (s) => { let h = 7; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+
+// Livros que ela ainda não tinha visto na estante entram com animação.
+const SEEN_KEY = 'bo.shelfSeen';
+function seenSet() { try { return new Set(JSON.parse(localStorage.getItem(SEEN_KEY) || '[]')); } catch { return new Set(); } }
+
+function shelfItemsHTML(list, year, goal) {
+  const seen = seenSet();
+  const firstVisit = seen.size === 0;
+  const parts = [];
+  list.forEach((b, i) => {
+    const title = cleanTitle(b.title);
+    const h = hashOf(b.id + title);
+    const isNew = !firstVisit && !seen.has(b.id);
+    const cls = isNew ? ' new' : '';
+    if (b.sparkles) {
+      parts.push(`<div class="slot${cls}"><button class="face" data-action="open" data-id="${b.id}" style="--tilt:${(h % 3) - 1}deg" aria-label="${esc(title)}, favorito">
+        ${coverHTML(b)}<span class="face-spark" aria-hidden="true">${ic.sparkle}</span></button></div>`);
+    } else {
+      const w = Math.max(17, Math.min(34, Math.round(12 + (b.pages || 380) / 46)));
+      const hh = 88 + (h % 30);
+      const lean = i > 0 && h % 5 === 0;
+      const cached = b.cover_url && spineCache[b.cover_url];
+      const bg = cached || colorFor(title);
+      parts.push(`<div class="slot${cls}${lean ? ' lean' : ''}" style="--lean:${-(5 + (h % 4))}deg">
+        <button class="spine" data-action="open" data-id="${b.id}" ${b.cover_url && !cached ? `data-cover="${esc(b.cover_url)}"` : ''}
+          style="width:${w}px;height:${hh}px;background:${bg};color:${spineInk(bg)}" aria-label="${esc(title)}">
+          <span>${esc(title)}</span></button></div>`);
+    }
+    if (i === 8) parts.push('<div class="slot deco" aria-hidden="true"><svg width="46" height="78" viewBox="0 0 46 78"><path d="M23 46C22 34 14 26 6 24c3 9 9 16 17 22z" fill="#6F8A5E"/><path d="M23 46c1-13 8-22 17-25-2 10-8 18-17 25z" fill="#7F9C6B"/><path d="M23 46c-2-14 0-26 4-36 4 11 3 23-4 36z" fill="#5E7A50"/><path d="M10 46h26l-3 30H13z" fill="#C46F4E"/><rect x="8" y="44" width="30" height="5" rx="1.5" fill="#A65A3D"/></svg></div>');
+    if (i === 20) parts.push('<div class="slot deco" aria-hidden="true"><svg width="30" height="70" viewBox="0 0 30 70"><ellipse cx="15" cy="14" rx="7" ry="9" fill="#FFD98A" opacity="0.35"/><path d="M15 6c3 4 3 8 0 10-3-2-3-6 0-10z" fill="#F2A93B"/><rect x="14.4" y="15" width="1.2" height="5" fill="#3A2E29"/><rect x="7" y="20" width="16" height="44" rx="2" fill="#F4EBDD"/><rect x="4" y="63" width="22" height="5" rx="2" fill="#A65A3D"/></svg></div>');
+  });
+  if (list.length) parts.push('<div class="slot deco" aria-hidden="true"><svg width="22" height="64" viewBox="0 0 22 64"><path d="M2 64V16c0-8 6-14 14-14h4v62z" fill="var(--bookend)"/></svg></div>');
+  if (year === thisYear()) {
+    for (let k = 0; k < Math.max(0, goal - list.length); k++) parts.push(`<div class="slot" aria-hidden="true"><i class="ghost" style="height:${92 + ((k * 7) % 18)}px"></i></div>`);
+  }
+  return parts.join('');
+}
+
+function renderShelf() {
+  const lidos = state.books.filter((b) => b.status === 'lido');
+  const years = [...new Set([thisYear(), ...lidos.map(bookYear)])].sort((a, b) => b - a);
+  const year = years.includes(state.shelfYear) ? state.shelfYear : thisYear();
+  const list = lidos.filter((b) => bookYear(b) === year)
+    .sort((a, b) => (a.finished_at || a.created_at || '').localeCompare(b.finished_at || b.created_at || ''));
+  const isCurrent = year === thisYear();
+  const goal = goalFor(year);
+  const n = list.length;
+  const pct = Math.min(100, Math.round((n / goal) * 100));
+  const style = shelfStyle();
+  const ge = state.goalEdit;
+
+  const summary = !isCurrent
+    ? `<span><b>${n} ${n === 1 ? 'livro lido' : 'livros lidos'}</b> em ${year}</span>`
+    : n >= goal
+      ? `<span><b>Meta batida! 🎉</b> ${n} lidos · meta de ${goal}</span>`
+      : `<span><b>${n} ${n === 1 ? 'lido' : 'lidos'}</b> · faltam ${goal - n} para a meta de ${goal}</span>`;
+
+  return `
+  <div class="page shelf-page">
+    <header class="shelf-head">
+      <span class="eyebrow">Minha Estante</span>
+      <div class="shelf-title-row">
+        <h1 class="disp">${year}</h1>
+        ${years.length > 1 ? `<div class="year-chips" role="group" aria-label="Ano">
+          ${years.map((y) => `<button class="chip" data-action="shelf-year" data-value="${y}" aria-pressed="${y === year}">${y}</button>`).join('')}
+        </div>` : ''}
+      </div>
+      <div class="shelf-progress">
+        <div class="shelf-sum">${summary}
+          ${isCurrent && !ge ? '<button class="linkbtn small" data-action="goal-edit">Editar meta</button>' : ''}</div>
+        ${isCurrent ? `<div class="bar" role="img" aria-label="${pct}% da meta"><div style="width:${pct}%"></div></div>` : ''}
+      </div>
+      ${ge ? `
+      <form id="goalForm" class="goal-edit" novalidate>
+        <span class="label">Meta de ${year}</span>
+        <div class="stepper">
+          <button type="button" class="iconbtn step" data-action="goal-step" data-value="-1" aria-label="Diminuir meta">–</button>
+          <input id="goalInput" type="number" inputmode="numeric" min="1" max="999" value="${ge.value}" aria-label="Meta de livros">
+          <button type="button" class="iconbtn step" data-action="goal-step" data-value="1" aria-label="Aumentar meta">+</button>
+        </div>
+        <div class="goal-actions">
+          <button type="button" class="btn small" data-action="goal-cancel">Cancelar</button>
+          <button type="submit" class="btn small primary">Salvar</button>
+        </div>
+      </form>` : ''}
+      <div class="segmented small" role="group" aria-label="Estilo da estante">
+        ${SHELF_STYLES.map((s) => `<button data-action="shelf-style" data-value="${s.id}" aria-pressed="${style === s.id}">${s.label}</button>`).join('')}
+      </div>
+    </header>
+
+    ${!state.loaded ? '<div class="empty">Arrumando sua estante…</div>' : `
+    <section class="bookcase bc-${style}" aria-label="Estante de ${year}">
+      <div class="shelves">${shelfItemsHTML(list, year, goal)}</div>
+    </section>
+    ${!n ? `<p class="hint center">Quando um livro for marcado como Lido, ele aparece aqui.</p>` : '<p class="hint center">Favoritos ficam de frente · toque num livro para abrir a ficha</p>'}`}
+  </div>`;
+}
+
+function markShelfSeen() {
+  const ids = state.books.filter((b) => b.status === 'lido').map((b) => b.id);
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids)); } catch { /* sem armazenamento */ }
 }
 
 /* ---------------- render: ficha ---------------- */
@@ -1016,8 +1210,14 @@ function render() {
   else if (state.sheet?.kind === 'cover') { const b = byId(state.sheet.id); sheet = b ? renderCover(b) : ''; }
   else if (state.sheet?.kind === 'themes') sheet = renderThemes();
 
-  app.innerHTML = `<div class="shell" ${sheet ? 'aria-hidden="true"' : ''}>${renderLibrary()}</div>${renderNav()}${sheet}`;
+  const main = state.view === 'shelf' ? renderShelf() : renderLibrary();
+  app.innerHTML = `<div class="shell" ${sheet ? 'aria-hidden="true"' : ''}>${main}</div>${renderNav()}${sheet}`;
   document.body.style.overflow = sheet ? 'hidden' : '';
+  if (state.view === 'shelf' && state.loaded) {
+    paintSpines();
+    // Depois que a animação dos livros novos rodou, eles passam a contar como vistos.
+    setTimeout(markShelfSeen, 1200);
+  }
 
   const sh = document.querySelector('.sheet');
   // A animação de entrada só roda quando uma tela nova abre, não a cada alteração.
@@ -1126,6 +1326,29 @@ document.addEventListener('click', async (e) => {
     }
     case 'themes':
       state.sheet = { kind: 'themes' }; render(); document.querySelector('.sheet')?.scrollTo(0, 0); break;
+    case 'nav': {
+      const v = el.dataset.value;
+      if (state.view === v) { window.scrollTo({ top: 0, behavior: 'smooth' }); break; }
+      state.view = v; state.goalEdit = null;
+      try { localStorage.setItem('bo.view', v); } catch { /* sem armazenamento */ }
+      render(); window.scrollTo(0, 0); break;
+    }
+    case 'shelf-year':
+      state.shelfYear = Number(el.dataset.value); state.goalEdit = null; render(); break;
+    case 'shelf-style':
+      saveMeta({ shelfStyle: el.dataset.value }); break;
+    case 'goal-edit':
+      state.goalEdit = { value: goalFor(thisYear()) }; render(); document.getElementById('goalInput')?.focus(); break;
+    case 'goal-cancel':
+      state.goalEdit = null; render(); break;
+    case 'goal-step': {
+      const input = document.getElementById('goalInput');
+      const cur = Number(input?.value) || goalFor(thisYear());
+      const next = Math.max(1, Math.min(999, cur + Number(el.dataset.value)));
+      if (input) input.value = next;
+      state.goalEdit = { value: next };
+      break;
+    }
     case 'theme-pick':
       if (sheet) sheet.keepScroll = true;
       chooseTheme(el.dataset.value); break;
@@ -1255,6 +1478,14 @@ document.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (e.target.id === 'authForm') onAuthSubmit(e.target);
   if (e.target.id === 'recoveryForm') onRecoverySubmit(e.target);
+  if (e.target.id === 'goalForm') {
+    const v = Math.round(Number(document.getElementById('goalInput')?.value));
+    if (!Number.isFinite(v) || v < 1) { toast('A meta precisa ser de pelo menos 1 livro.', true); return; }
+    const goal = Math.min(999, v);
+    state.goalEdit = null;
+    const goals = { ...(meta().goals || {}), [thisYear()]: goal };
+    if (await saveMeta({ goals })) toast(`Meta de ${thisYear()}: ${goal} livros`);
+  }
   if (e.target.id === 'manualForm') {
     const f = e.target;
     const title = f.title.value.trim();
@@ -1336,7 +1567,7 @@ document.addEventListener('keydown', (e) => {
 
 /* ---------------- atualização sem cache ---------------- */
 // Quando eu publico uma versão nova, o app percebe e recarrega sozinho com os arquivos novos.
-const APP_VERSION = '2026.10.23-2';
+const APP_VERSION = '2026.10.23-3';
 async function checkVersion() {
   try {
     const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
@@ -1359,6 +1590,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 let savedTheme = 'editorial';
 try { savedTheme = localStorage.getItem(THEME_KEY) || 'editorial'; } catch { /* sem armazenamento */ }
 applyTheme(savedTheme);
+try { if (localStorage.getItem('bo.view') === 'shelf') state.view = 'shelf'; } catch { /* sem armazenamento */ }
 
 sb.auth.onAuthStateChange((event, session) => {
   const was = state.session?.user?.id;
