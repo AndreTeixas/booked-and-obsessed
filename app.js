@@ -114,11 +114,26 @@ function gbLang(code) {
   if (code.startsWith('en')) return 'en';
   return null;
 }
+// Chave restrita ao site (andreteixas.github.io) e à Books API.
+const GOOGLE_BOOKS_KEY = 'AIzaSyBQj2zWWbfeQrkp03KfideegDS6J98iils';
+
+class SearchError extends Error {
+  constructor(kind) { super(kind); this.kind = kind; }
+}
+function searchErrorText(err) {
+  if (err?.kind === 'offline') return 'Parece que você está sem internet. Confira a conexão e tente de novo.';
+  if (err?.kind === 'limit') return 'O Google Books atingiu o limite de buscas agora. Tente de novo daqui a pouco.';
+  return 'Não consegui falar com o Google Books nem com o Open Library. Tente de novo em instantes.';
+}
+
 async function gbSearch(q, { lang = '', max = 20 } = {}) {
-  const params = new URLSearchParams({ q, maxResults: String(max), printType: 'books' });
+  const params = new URLSearchParams({ q, maxResults: String(max), printType: 'books', key: GOOGLE_BOOKS_KEY });
   if (lang) params.set('langRestrict', lang);
-  const res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`);
-  if (!res.ok) throw new Error('google');
+  let res;
+  try { res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`); }
+  catch { throw new SearchError(navigator.onLine === false ? 'offline' : 'network'); }
+  if (res.status === 429) throw new SearchError('limit');
+  if (!res.ok) throw new SearchError('google');
   const data = await res.json();
   return (data.items || []).map((it) => {
     const v = it.volumeInfo || {};
@@ -131,8 +146,51 @@ async function gbSearch(q, { lang = '', max = 20 } = {}) {
       language: gbLang(v.language),
       cover: gbCover(v),
       publisher: v.publisher || '',
+      source: 'google',
     };
   });
+}
+
+/* ---------------- Open Library (reserva) ---------------- */
+async function olSearch(q, { max = 20 } = {}) {
+  const clean = q.replace(/\b(intitle|inauthor):/g, ' ').replace(/\s+/g, ' ').trim();
+  const params = new URLSearchParams({
+    q: clean, limit: String(max),
+    fields: 'key,title,subtitle,author_name,number_of_pages_median,cover_i,language,first_publish_year,cover_edition_key',
+  });
+  let res;
+  try { res = await fetch(`https://openlibrary.org/search.json?${params}`); }
+  catch { throw new SearchError(navigator.onLine === false ? 'offline' : 'network'); }
+  if (!res.ok) throw new SearchError('openlibrary');
+  const data = await res.json();
+  return (data.docs || []).map((d) => {
+    const langs = d.language || [];
+    const language = langs.includes('por') ? 'pt' : langs.includes('eng') ? 'en' : null;
+    return {
+      gid: `ol:${d.cover_edition_key || d.key}`,
+      title: [d.title, d.subtitle].filter(Boolean).join(': '),
+      author: (d.author_name || []).slice(0, 2).join(', '),
+      pages: d.number_of_pages_median || null,
+      year: d.first_publish_year ? String(d.first_publish_year) : '',
+      language,
+      cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : null,
+      publisher: '',
+      source: 'openlibrary',
+    };
+  });
+}
+
+// Google Books primeiro; Open Library completa quando o Google falha ou não traz nada.
+async function searchBooks(q, { lang = '', max = 20 } = {}) {
+  let google = [];
+  let gErr = null;
+  try { google = await gbSearch(q, { lang, max }); } catch (err) { gErr = err; }
+  if (google.length >= 5) return google;
+  let ol = [];
+  try { ol = await olSearch(q, { max }); } catch (err) { if (gErr) throw gErr; }
+  if (gErr && !ol.length) throw gErr;
+  const seen = new Set(google.map((r) => norm(r.title) + '|' + norm(r.author)));
+  return [...google, ...ol.filter((r) => !seen.has(norm(r.title) + '|' + norm(r.author)))];
 }
 
 /* ---------------- dados ---------------- */
@@ -180,7 +238,7 @@ async function deleteBook(id) {
 }
 
 /* ---------------- capas em lote ---------------- */
-const TRIED_KEY = 'bo.coverTried';
+const TRIED_KEY = 'bo.coverTried.v2';
 function triedSet() {
   try { return new Set(JSON.parse(localStorage.getItem(TRIED_KEY) || '[]')); } catch { return new Set(); }
 }
@@ -197,31 +255,49 @@ async function fetchMissingCovers() {
   const tried = triedSet();
   state.coverJob = { done: 0, total: list.length, found: 0 };
   render();
+  let lastErr = null;
+  let failures = 0;
   for (const b of list) {
     try {
       const t = cleanTitle(b.title);
       const author = (b.author || '').split(',')[0];
       let q = `intitle:${t}`;
       if (author) q += ` inauthor:${author}`;
-      let items = await gbSearch(q, { lang: b.language || '', max: 10 });
-      if (!items.some((i) => i.cover) && b.language) items = await gbSearch(q, { max: 10 });
-      const hit = items.find((i) => i.cover);
+      let hit = null;
+      let gOk = false;
+      try {
+        let items = await gbSearch(q, { lang: b.language || '', max: 10 });
+        gOk = true;
+        if (!items.some((i) => i.cover) && b.language) items = await gbSearch(q, { max: 10 });
+        hit = items.find((i) => i.cover);
+      } catch (err) { lastErr = err; }
+      if (!hit) {
+        const ol = await olSearch(`${t} ${author}`, { max: 10 });
+        hit = ol.find((i) => i.cover);
+      }
       if (hit) {
         b.cover_url = hit.cover;
         b.google_books_id = hit.gid;
-        await sb.from('books').update({ cover_url: hit.cover, google_books_id: hit.gid }).eq('id', b.id);
+        const { error } = await sb.from('books').update({ cover_url: hit.cover, google_books_id: hit.gid }).eq('id', b.id);
+        if (error) throw new SearchError('save');
         state.coverJob.found++;
       }
-    } catch { /* segue para o próximo */ }
-    tried.add(b.id);
-    saveTried(tried);
+      // Só desiste do livro se o Google respondeu de verdade (ou se achou capa).
+      if (gOk || hit) { tried.add(b.id); saveTried(tried); }
+      else failures++;
+    } catch (err) {
+      // Falha de rede ou de serviço: não marca como tentado, para dar para buscar de novo.
+      lastErr = err;
+      failures++;
+    }
     state.coverJob.done++;
     render();
     await new Promise((r) => setTimeout(r, 250));
   }
   const { found, total } = state.coverJob;
   state.coverJob = null;
-  toast(`${found} de ${total} capas encontradas`);
+  if (failures === total) toast(searchErrorText(lastErr), true);
+  else toast(`${found} de ${total} capas encontradas${failures ? `; ${failures} ficaram para tentar de novo` : ''}`);
   render();
 }
 
@@ -529,7 +605,7 @@ function renderAdd() {
 
     <div class="results">
       ${s.loading ? '<p class="hint">Buscando…</p>' : ''}
-      ${s.error ? '<p class="hint">Não consegui falar com o Google Books. Tente de novo em instantes.</p>' : ''}
+      ${s.error ? `<p class="hint">${esc(s.error)}</p>` : ''}
       ${!s.loading && s.q && s.results && !results.length ? '<p class="hint">Nenhuma edição encontrada com esse filtro.</p>' : ''}
       ${results.map((r) => `
         <button class="result" data-action="pick" data-gid="${esc(r.gid)}" aria-pressed="${picked?.gid === r.gid}">
@@ -561,7 +637,8 @@ function renderCover(b) {
       <input id="cq" type="search" value="${esc(s.q || '')}" placeholder="Buscar outra edição" autocomplete="off" enterkeyhint="search">
     </label>
     ${s.loading ? '<p class="hint">Buscando edições…</p>' : ''}
-    ${!s.loading && !opts.length ? '<p class="hint">Nenhuma capa encontrada. Tente buscar pelo título em inglês ou pelo nome da autora.</p>' : ''}
+    ${s.error ? `<p class="hint">${esc(s.error)}</p>` : ''}
+    ${!s.loading && !s.error && !opts.length ? '<p class="hint">Nenhuma capa encontrada. Tente buscar pelo título em inglês ou pelo nome da autora.</p>' : ''}
     <div class="covergrid">
       ${opts.map((r) => `<button data-action="cover-pick" data-gid="${esc(r.gid)}" aria-pressed="${b.google_books_id === r.gid}" aria-label="${esc(r.title)} ${r.year || ''}">
         <img src="${esc(r.cover)}" alt="" loading="lazy" referrerpolicy="no-referrer"></button>`).join('')}
@@ -599,16 +676,16 @@ async function runAddSearch(q) {
   const s = state.sheet;
   s.q = q;
   if (!q.trim()) { s.results = null; render(); return; }
-  s.loading = true; s.error = false; render();
+  s.loading = true; s.error = null; render();
   try {
-    s.results = await gbSearch(q, { max: 30 });
-  } catch { s.error = true; s.results = []; }
+    s.results = await searchBooks(q, { max: 30 });
+  } catch (err) { s.error = searchErrorText(err); s.results = []; }
   if (state.sheet === s) { s.loading = false; render(); }
 }
 async function runCoverSearch(q) {
   const s = state.sheet;
-  s.q = q; s.loading = true; render();
-  try { s.results = await gbSearch(q, { max: 30 }); } catch { s.results = []; }
+  s.q = q; s.loading = true; s.error = null; render();
+  try { s.results = await searchBooks(q, { max: 30 }); } catch (err) { s.error = searchErrorText(err); s.results = []; }
   if (state.sheet === s) { s.loading = false; render(); }
 }
 
