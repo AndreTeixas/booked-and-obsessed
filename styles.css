@@ -340,6 +340,9 @@ img { max-width: 100%; display: block; }
 .confirm { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; font-size: 14px; }
 
 /* busca de livros */
+.segmented { display: inline-grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: flex-start; border: 1px solid var(--ink); border-radius: 22px; padding: 3px; gap: 3px; }
+.segmented button { height: 36px; min-width: 96px; padding: 0 16px; border: none; border-radius: 18px; background: transparent; color: var(--ink); font-size: 14px; }
+.segmented button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 500; }
 .lang-filter { display: flex; gap: 6px; }
 .results { display: flex; flex-direction: column; }
 .result {

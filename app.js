@@ -152,12 +152,13 @@ async function gbSearch(q, { lang = '', max = 20 } = {}) {
 }
 
 /* ---------------- Open Library (reserva) ---------------- */
-async function olSearch(q, { max = 20 } = {}) {
-  const clean = q.replace(/\b(intitle|inauthor):/g, ' ').replace(/\s+/g, ' ').trim();
+async function olSearch(q, { max = 20, author = '' } = {}) {
   const params = new URLSearchParams({
-    q: clean, limit: String(max),
+    limit: String(max),
     fields: 'key,title,subtitle,author_name,number_of_pages_median,cover_i,language,first_publish_year,cover_edition_key',
   });
+  if (author) params.set('author', author);
+  else params.set('q', q.replace(/\b(intitle|inauthor):/g, ' ').replace(/\s+/g, ' ').trim());
   let res;
   try { res = await fetch(`https://openlibrary.org/search.json?${params}`); }
   catch { throw new SearchError(navigator.onLine === false ? 'offline' : 'network'); }
@@ -181,6 +182,31 @@ async function olSearch(q, { max = 20 } = {}) {
 }
 
 // Google Books primeiro; Open Library completa quando o Google falha ou não traz nada.
+// Busca só livros escritos pela autora: filtra quem apenas cita o nome e junta edições repetidas.
+async function searchByAuthor(name, { max = 40 } = {}) {
+  const who = name.replace(/"/g, '').trim();
+  let google = [];
+  let gErr = null;
+  try { google = await gbSearch(`inauthor:"${who}"`, { max }); } catch (err) { gErr = err; }
+  let ol = [];
+  if (google.length < 10) {
+    try { ol = await olSearch('', { max, author: who }); } catch (err) { if (gErr) throw gErr; }
+    if (gErr && !ol.length) throw gErr;
+  }
+  const target = norm(who);
+  const all = [...google, ...ol];
+  const strict = all.filter((r) => norm(r.author).includes(target));
+  const list = strict.length ? strict : all;
+  // Uma entrada por título e idioma, preferindo a que tem capa.
+  const byKey = new Map();
+  for (const r of list) {
+    const key = norm(r.title).replace(/[^a-z0-9]/g, '') + '|' + (r.language || '');
+    const prev = byKey.get(key);
+    if (!prev || (!prev.cover && r.cover)) byKey.set(key, r);
+  }
+  return [...byKey.values()];
+}
+
 async function searchBooks(q, { lang = '', max = 20 } = {}) {
   let google = [];
   let gErr = null;
@@ -679,8 +705,12 @@ function renderAdd() {
       </form>
       <button class="linkbtn" data-action="manual-off">Voltar para a busca</button>
     ` : `
+    <div class="segmented" role="group" aria-label="Buscar por">
+      <button data-action="search-mode" data-value="title" aria-pressed="${s.mode !== 'author'}">Título</button>
+      <button data-action="search-mode" data-value="author" aria-pressed="${s.mode === 'author'}">Autora</button>
+    </div>
     <label class="search" for="gq">${ic.search}
-      <input id="gq" type="search" placeholder="Título ou autora" value="${esc(s.q || '')}" autocomplete="off" enterkeyhint="search">
+      <input id="gq" type="search" placeholder="${s.mode === 'author' ? 'Nome da autora, ex.: Elsie Silver' : 'Título do livro'}" value="${esc(s.q || '')}" autocomplete="off" enterkeyhint="search">
     </label>
     <div class="lang-filter">
       ${[['', 'Todos'], ['pt', 'Português'], ['en', 'Inglês']].map(([v, l]) => `<button class="chip" data-action="lang" data-value="${v}" aria-pressed="${(s.lang || '') === v}">${l}</button>`).join('')}
@@ -781,7 +811,7 @@ async function runAddSearch(q) {
   if (!q.trim()) { s.results = null; render(); return; }
   s.loading = true; s.error = null; render();
   try {
-    s.results = await searchBooks(q, { max: 30 });
+    s.results = s.mode === 'author' ? await searchByAuthor(q) : await searchBooks(q, { max: 30 });
   } catch (err) { s.error = searchErrorText(err); s.results = []; }
   if (state.sheet === s) { s.loading = false; render(); }
 }
@@ -822,6 +852,15 @@ document.addEventListener('click', async (e) => {
       state.sheet = null; render(); break;
     case 'add':
       state.sheet = { kind: 'add', q: '', lang: '' }; render(); document.getElementById('gq')?.focus(); break;
+    case 'search-mode': {
+      const mode = el.dataset.value;
+      if (sheet.mode === mode || (!sheet.mode && mode === 'title')) break;
+      sheet.mode = mode; sheet.picked = null; sheet.results = null;
+      render();
+      document.getElementById('gq')?.focus();
+      if (sheet.q?.trim()) runAddSearch(sheet.q);
+      break;
+    }
     case 'lang':
       sheet.lang = el.dataset.value; render(); break;
     case 'pick':
