@@ -157,13 +157,18 @@ const fmtDate = (d) => {
 
 let toastTimer;
 let toastUndo = null;
-function toast(msg, isError = false, undo = null) {
+let toastGo = null;
+// undo: função do botão "Desfazer"; go: função do botão "Ver na estante".
+function toast(msg, isError = false, undo = null, go = null) {
   toastUndo = undo;
-  toastEl.innerHTML = `<span>${esc(msg)}</span>${undo ? '<button class="toast-btn" data-action="toast-undo">Desfazer</button>' : ''}`;
+  toastGo = go;
+  toastEl.innerHTML = `<span>${esc(msg)}</span>`
+    + (go ? '<button class="toast-btn" data-action="toast-go">Ver na estante</button>' : '')
+    + (undo ? '<button class="toast-btn" data-action="toast-undo">Desfazer</button>' : '');
   toastEl.classList.toggle('error', isError);
   toastEl.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toastEl.hidden = true; toastUndo = null; }, isError ? 4000 : undo ? 6000 : 1800);
+  toastTimer = setTimeout(() => { toastEl.hidden = true; toastUndo = null; toastGo = null; }, isError ? 4000 : (undo || go) ? 7000 : 1800);
 }
 
 // Nome da fonte de onde a capa veio, para mostrar embaixo dela.
@@ -351,7 +356,7 @@ function updateBook(id, patch, { quiet = false, rerender = true } = {}) {
     pending.delete(id);
     const { error } = await sb.from('books').update(p).eq('id', id);
     if (error) toast('Não salvou. Tente de novo em instantes.', true);
-    else if (!quiet && !toastUndo) toast('Salvo'); // não esconde um aviso com "Desfazer"
+    else if (!quiet && !toastUndo && !toastGo) toast('Salvo'); // não esconde um aviso com botões
   }, 500);
 }
 
@@ -880,10 +885,11 @@ function shelfItemsHTML(list, year, goal) {
   list.forEach((b, i) => {
     const title = cleanTitle(b.title);
     const h = hashOf(b.id + title);
+    // Livro que ela ainda não viu na estante fica escondido até a animação de chegada.
     const isNew = !firstVisit && !seen.has(b.id);
-    const cls = isNew ? ' new' : '';
+    const cls = isNew ? ' pending' : '';
     if (b.sparkles) {
-      parts.push(`<div class="slot${cls}"><button class="face" data-action="open" data-id="${b.id}" style="--tilt:${(h % 3) - 1}deg" aria-label="${esc(title)}, favorito">
+      parts.push(`<div class="slot${cls}" data-id="${b.id}"><button class="face" data-action="open" data-id="${b.id}" style="--tilt:${(h % 3) - 1}deg" aria-label="${esc(title)}, favorito">
         ${coverHTML(b)}<span class="face-spark" aria-hidden="true">${ic.sparkle}</span></button></div>`);
     } else {
       const w = Math.max(17, Math.min(34, Math.round(12 + (b.pages || 380) / 46)));
@@ -891,7 +897,7 @@ function shelfItemsHTML(list, year, goal) {
       const lean = i > 0 && h % 5 === 0;
       const cached = b.cover_url && spineCache[b.cover_url];
       const bg = cached || colorFor(title);
-      parts.push(`<div class="slot${cls}${lean ? ' lean' : ''}" style="--lean:${-(5 + (h % 4))}deg">
+      parts.push(`<div class="slot${cls}${lean ? ' lean' : ''}" data-id="${b.id}" style="--lean:${-(5 + (h % 4))}deg">
         <button class="spine" data-action="open" data-id="${b.id}" ${b.cover_url && !cached ? `data-cover="${esc(b.cover_url)}"` : ''}
           style="width:${w}px;height:${hh}px;background:${bg};color:${spineInk(bg)}" aria-label="${esc(title)}">
           <span>${esc(title)}</span></button></div>`);
@@ -966,9 +972,157 @@ function renderShelf() {
   </div>`;
 }
 
-function markShelfSeen() {
-  const ids = state.books.filter((b) => b.status === 'lido').map((b) => b.id);
-  try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids)); } catch { /* sem armazenamento */ }
+function markShelfSeen(ids = state.books.filter((b) => b.status === 'lido').map((b) => b.id)) {
+  const all = seenSet();
+  ids.forEach((id) => all.add(id));
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...all])); } catch { /* sem armazenamento */ }
+}
+
+/* ---------------- chegada de livros novos na estante ---------------- */
+let arrival = null; // { skip: false } enquanto a animação roda
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function scrollToSlot(slot) {
+  const r = slot.getBoundingClientRect();
+  const top = window.scrollY + r.top - (window.innerHeight - r.height) / 2;
+  window.scrollTo({ top: Math.max(0, top), behavior: reducedMotion() ? 'auto' : 'smooth' });
+}
+
+function revealSlot(slot, cls = 'landed') {
+  slot.classList.remove('pending');
+  slot.classList.add(cls);
+  markShelfSeen([slot.dataset.id]);
+  setTimeout(() => slot.classList.remove(cls), 1400);
+}
+
+function confetti() {
+  const colors = ['#F5C542', '#D7263D', '#8C5A6A', '#7FD1C7', '#B9A4E8', '#F2B01E', '#3E9142'];
+  const layer = document.createElement('div');
+  layer.className = 'confetti';
+  layer.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 70; i++) {
+    const p = document.createElement('i');
+    p.style.left = `${Math.random() * 100}%`;
+    p.style.background = colors[i % colors.length];
+    p.style.width = `${6 + Math.random() * 6}px`;
+    p.style.height = `${8 + Math.random() * 8}px`;
+    layer.appendChild(p);
+    p.animate([
+      { transform: `translate(0, -20px) rotate(0deg)`, opacity: 1 },
+      { transform: `translate(${(Math.random() - 0.5) * 160}px, ${window.innerHeight + 40}px) rotate(${Math.random() * 720}deg)`, opacity: 0.9 },
+    ], { duration: 1800 + Math.random() * 1200, delay: Math.random() * 400, easing: 'cubic-bezier(.2,.6,.4,1)', fill: 'forwards' });
+  }
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 3600);
+}
+
+// Livros novos: capa grande no centro → a página desce sozinha → o livro voa até a vaga.
+async function playArrivals() {
+  if (arrival || state.sheet || state.view !== 'shelf') return;
+  const pendingIds = [...document.querySelectorAll('.slot.pending')].map((s) => s.dataset.id);
+  if (!pendingIds.length) return;
+  arrival = { skip: false };
+  const year = state.shelfYear && state.shelfYear !== thisYear() ? state.shelfYear : thisYear();
+  const goal = goalFor(year);
+  const lidosNoAno = state.books.filter((b) => b.status === 'lido' && bookYear(b) === year).length;
+  const metaAgora = year === thisYear() && lidosNoAno >= goal && lidosNoAno - pendingIds.length < goal;
+
+  const slotOf = (id) => document.querySelector(`.slot[data-id="${CSS.escape(id)}"]`);
+
+  // Quem prefere menos movimento: só rola até o livro e destaca.
+  if (reducedMotion()) {
+    for (const id of pendingIds) { const s = slotOf(id); if (s) { scrollToSlot(s); revealSlot(s, 'highlight'); await wait(700); } }
+    arrival = null;
+    if (metaAgora) toast(`Meta batida! 🎉 ${lidosNoAno} livros em ${year}`);
+    return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'arrival';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-label', 'Livro terminado');
+  overlay.innerHTML = '<div class="arrival-card"><span class="eyebrow">Livro terminado!</span><div class="arrival-cover"></div><h2 class="disp arrival-title"></h2><p class="arrival-count"></p><span class="arrival-skip">toque para pular</span></div>';
+  document.body.appendChild(overlay);
+  const skipAll = () => { arrival.skip = true; };
+  overlay.addEventListener('click', skipAll);
+
+  let count = lidosNoAno - pendingIds.length;
+  for (let i = 0; i < pendingIds.length; i++) {
+    const id = pendingIds[i];
+    const b = byId(id);
+    const slot0 = slotOf(id);
+    if (!b || !slot0) continue;
+    if (arrival.skip) { revealSlot(slot0); continue; }
+    count++;
+
+    // 1. Capa grande no centro.
+    overlay.querySelector('.arrival-cover').innerHTML = coverHTML(b, 'lg');
+    overlay.querySelector('.arrival-title').textContent = cleanTitle(b.title);
+    overlay.querySelector('.arrival-count').textContent = year !== thisYear()
+      ? `${count}º livro de ${year}`
+      : count > goal ? `${count} livros em ${year} · meta batida` : `${count} de ${goal} em ${year}`;
+    overlay.classList.remove('flying');
+    overlay.classList.add('show');
+    await wait(i === 0 ? 1400 : 900);
+    if (arrival.skip) { revealSlot(slot0); continue; }
+
+    // 2. A página desce até a vaga.
+    overlay.classList.add('flying');
+    scrollToSlot(slot0);
+    await wait(750);
+    const slot = slotOf(id) || slot0;
+    if (arrival.skip) { revealSlot(slot); continue; }
+
+    // 3. A capa voa e pousa na prateleira.
+    const from = overlay.querySelector('.arrival-cover .cover').getBoundingClientRect();
+    const target = (slot.querySelector('.spine, .face') || slot).getBoundingClientRect();
+    const flyer = overlay.querySelector('.arrival-cover .cover').cloneNode(true);
+    flyer.classList.add('flyer');
+    Object.assign(flyer.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px`, transformOrigin: 'top left' });
+    document.body.appendChild(flyer);
+    overlay.querySelector('.arrival-cover').style.visibility = 'hidden';
+    const sx = target.width / from.width;
+    const sy = target.height / from.height;
+    const dx = target.left - from.left;
+    const dy = target.top - from.top;
+    await flyer.animate([
+      { transform: 'translate(0,0) scale(1,1)', opacity: 1 },
+      { transform: `translate(${dx * 0.55}px, ${dy * 0.55 - 60}px) scale(${(1 + sx) / 2}, ${(1 + sy) / 2}) rotate(-8deg)`, opacity: 1, offset: 0.6 },
+      { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, opacity: 0.6 },
+    ], { duration: 750, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' }).finished.catch(() => {});
+    flyer.remove();
+    overlay.querySelector('.arrival-cover').style.visibility = '';
+    revealSlot(slot);
+    overlay.classList.remove('show');
+    await wait(550);
+  }
+
+  // Pulou: mostra todos de uma vez, já no lugar.
+  if (arrival.skip) {
+    document.querySelectorAll('.slot.pending').forEach((s) => revealSlot(s));
+    const last = slotOf(pendingIds[pendingIds.length - 1]);
+    if (last) scrollToSlot(last);
+  }
+  overlay.remove();
+  document.querySelectorAll('.flyer').forEach((f) => f.remove());
+  arrival = null;
+
+  if (metaAgora) {
+    confetti();
+    toast(`Meta batida! 🎉 ${lidosNoAno} livros em ${year}`);
+  }
+}
+
+// Leva para a estante no ano do livro; a animação começa sozinha.
+function goToShelf(b) {
+  state.sheet = null;
+  state.view = 'shelf';
+  state.shelfYear = bookYear(b);
+  state.goalEdit = null;
+  try { localStorage.setItem('bo.view', 'shelf'); } catch { /* sem armazenamento */ }
+  window.scrollTo(0, 0);
+  render();
 }
 
 /* ---------------- render: ficha ---------------- */
@@ -1215,9 +1369,11 @@ function render() {
   document.body.style.overflow = sheet ? 'hidden' : '';
   if (state.view === 'shelf' && state.loaded) {
     paintSpines();
-    // Depois que a animação dos livros novos rodou, eles passam a contar como vistos.
-    setTimeout(markShelfSeen, 1200);
+    if (seenSet().size === 0) markShelfSeen(); // primeira visita: tudo já conta como visto
+    else if (!sheet) setTimeout(playArrivals, 350);
   }
+  // Se a tela mudou no meio da animação, os livros que faltavam aparecem direto.
+  if (arrival && (state.sheet || state.view !== 'shelf')) arrival.skip = true;
 
   const sh = document.querySelector('.sheet');
   // A animação de entrada só roda quando uma tela nova abre, não a cada alteração.
@@ -1260,6 +1416,7 @@ function setField(b, field, v) {
   const before = { status: b.status, finished_at: b.finished_at, current_page: b.current_page };
   const patch = { [field]: v };
   const today = new Date().toISOString().slice(0, 10);
+  const markedRead = field === 'status' && v === 'lido' && b.status !== 'lido';
   if (field === 'status' && v === 'lido' && !b.finished_at) patch.finished_at = today;
   if (field === 'status' && v === 'lido' && b.pages) patch.current_page = b.pages;
   if (field === 'status' && v === 'lendo' && b.current_page == null) patch.current_page = 0;
@@ -1273,12 +1430,12 @@ function setField(b, field, v) {
     if (!b.finished_at) patch.finished_at = today;
   }
   if (state.sheet) state.sheet.keepScroll = true;
-  updateBook(b.id, patch, { quiet: finishedNow });
-  if (finishedNow) {
+  updateBook(b.id, patch, { quiet: finishedNow || markedRead });
+  if (finishedNow || markedRead) {
     toast('Livro terminado! Foi para Lidos.', false, () => {
       if (state.sheet) state.sheet.keepScroll = true;
       updateBook(b.id, before, { quiet: true });
-    });
+    }, () => goToShelf(b));
   }
 }
 
@@ -1317,9 +1474,16 @@ document.addEventListener('click', async (e) => {
       else render();
       break;
     }
+    case 'toast-go': {
+      const fn = toastGo;
+      toastGo = null; toastUndo = null;
+      toastEl.hidden = true;
+      if (fn) fn();
+      break;
+    }
     case 'toast-undo': {
       const fn = toastUndo;
-      toastUndo = null;
+      toastUndo = null; toastGo = null;
       toastEl.hidden = true;
       if (fn) fn();
       break;
@@ -1567,7 +1731,7 @@ document.addEventListener('keydown', (e) => {
 
 /* ---------------- atualização sem cache ---------------- */
 // Quando eu publico uma versão nova, o app percebe e recarrega sozinho com os arquivos novos.
-const APP_VERSION = '2026.10.23-3';
+const APP_VERSION = '2026.10.23-4';
 async function checkVersion() {
   try {
     const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });

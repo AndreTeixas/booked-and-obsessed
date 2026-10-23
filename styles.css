@@ -600,10 +600,42 @@ img { max-width: 100%; display: block; }
 .face-spark { position: absolute; top: -7px; right: -7px; color: var(--sparkle); line-height: 0; }
 .face-spark svg { width: 16px; height: 16px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
 .ghost { display: block; width: 18px; border: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent); border-bottom: none; border-radius: 2px 2px 0 0; }
-@media (prefers-reduced-motion: no-preference) {
-  .slot.new { animation: shelf-in 0.7s cubic-bezier(.2, .9, .3, 1.2) both; }
-  @keyframes shelf-in { from { opacity: 0; transform: translateY(-40px) rotate(-6deg); } to { opacity: 1; transform: none; } }
+/* Livro novo esperando a animação: ocupa o lugar, mas ainda não aparece. */
+.slot.pending > * { visibility: hidden; }
+.slot.landed { animation: land 0.55s cubic-bezier(.3, 1.6, .5, 1); position: relative; }
+.slot.landed::after {
+  content: ""; position: absolute; left: 50%; bottom: 40%; width: 70px; height: 70px; margin-left: -35px; pointer-events: none;
+  background: radial-gradient(circle, rgba(245, 197, 66, 0.55) 0 18%, transparent 60%);
+  animation: glow 1.2s ease-out forwards;
 }
+.slot.highlight > * { outline: 3px solid var(--sparkle); outline-offset: 3px; border-radius: 3px; }
+@keyframes land { 0% { transform: translateY(-10px); } 60% { transform: translateY(3px); } 100% { transform: none; } }
+@keyframes glow { from { opacity: 1; transform: scale(0.6); } to { opacity: 0; transform: scale(1.6); } }
+
+/* Tela cheia de "livro terminado". */
+.arrival {
+  position: fixed; inset: 0; z-index: 80; display: grid; place-items: center;
+  padding: env(safe-area-inset-top, 0px) var(--gutter-r) env(safe-area-inset-bottom, 0px) var(--gutter-l);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  opacity: 0; transition: opacity 0.35s ease, background 0.4s ease; cursor: pointer;
+}
+.arrival.show { opacity: 1; }
+.arrival.flying { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.arrival.flying .eyebrow, .arrival.flying .arrival-title, .arrival.flying .arrival-count, .arrival.flying .arrival-skip { opacity: 0; }
+.arrival-card { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; max-width: 320px; }
+.arrival-card .eyebrow, .arrival-title, .arrival-count, .arrival-skip { transition: opacity 0.3s ease; }
+.arrival-card .eyebrow { color: var(--meta); font-weight: 500; }
+.arrival-cover .cover.lg { width: 168px; box-shadow: 0 26px 40px -18px var(--shadow); }
+.arrival.show .arrival-cover { animation: pop 0.6s cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes pop { from { transform: scale(0.6) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.arrival-title { margin: 4px 0 0; font-size: calc(30px * var(--display-scale)); line-height: 1.05; text-wrap: balance; }
+.arrival-count { margin: 0; font-size: 14px; color: var(--muted); font-variant-numeric: lining-nums tabular-nums; }
+.arrival-skip { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--placeholder); margin-top: 8px; }
+.flyer { position: fixed; z-index: 90; margin: 0; pointer-events: none; }
+
+.confetti { position: fixed; inset: 0; z-index: 95; pointer-events: none; overflow: hidden; }
+.confetti i { position: absolute; top: 0; display: block; border-radius: 2px; }
 
 /* ---------- toast ---------- */
 .toast {
