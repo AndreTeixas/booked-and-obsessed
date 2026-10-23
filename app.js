@@ -129,9 +129,15 @@ function searchErrorText(err) {
 async function gbSearch(q, { lang = '', max = 20 } = {}) {
   const params = new URLSearchParams({ q, maxResults: String(max), printType: 'books', key: GOOGLE_BOOKS_KEY });
   if (lang) params.set('langRestrict', lang);
+  // O Google Books recusa buscas aleatoriamente com 503; tentar de novo costuma funcionar.
+  const waits = [300, 600, 900, 1200];
   let res;
-  try { res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`); }
-  catch { throw new SearchError(navigator.onLine === false ? 'offline' : 'network'); }
+  for (let attempt = 0; ; attempt++) {
+    try { res = await fetch(`https://www.googleapis.com/books/v1/volumes?${params}`); }
+    catch { throw new SearchError(navigator.onLine === false ? 'offline' : 'network'); }
+    if ((res.status !== 503 && res.status !== 500) || attempt >= waits.length) break;
+    await new Promise((r) => setTimeout(r, waits[attempt]));
+  }
   if (res.status === 429) throw new SearchError('limit');
   if (!res.ok) throw new SearchError('google');
   const data = await res.json();
