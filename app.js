@@ -30,10 +30,9 @@ const LANGUAGES = [
   { id: 'pt', label: 'Português' },
   { id: 'en', label: 'Inglês' },
 ];
-const GENRES = ['Romance', 'Romantasia', 'Sports Romance', 'Mafia Romance', 'Dark Romance', 'Cowboy', 'SMUT'];
 const COLLECTIONS = [
   { id: 'favoritos', label: 'Favoritos', cls: 'c-blush', test: (b) => (b.sparkles || 0) > 0 },
-  { id: 'boyfriends', label: 'Book boyfriends', cls: 'c-sage', test: (b) => (b.book_boyfriends || []).length > 0 },
+  { id: 'boyfriends', label: 'Book boyfriends', cls: 'c-sage', test: (b) => state.bbs.some((x) => x.book_id === b.id) },
   { id: 'hot', label: 'Mais hot', cls: 'c-peach', test: (b) => (b.spicy || 0) >= 4 },
   { id: 'damage', label: 'Emotional damage', cls: 'c-blush', test: (b) => b.obsession === 'destruiu' },
   { id: 'reler', label: 'Quero reler', cls: 'c-sage', test: (b) => b.want_reread },
@@ -61,15 +60,12 @@ const ic = {
 /* ---------------- temas ---------------- */
 // As cores de cada tema ficam no styles.css; aqui ficam o nome, a prévia e a fonte do título.
 const THEMES = [
-  { id: 'editorial', name: 'Editorial', note: 'Claro ou escuro conforme o aparelho', bg: '#FAF6F2', ink: '#2B2326', accent: '#8C5A6A', meta: '#8C5A6A', font: "'Cormorant Garamond', Georgia, serif", style: 'italic', weight: 500, caps: false, spines: ['#4A2F3F', '#B5747B', '#3E3A6B'] },
-  { id: 'noite', name: 'Noite Estrelada', note: 'Romantasia de cortes feéricas', bg: '#141A33', ink: '#E9E6F5', accent: '#C9CCE8', meta: '#D9B76A', font: "Cinzel, Georgia, serif", style: 'normal', weight: 600, caps: false, spines: ['#3E3A6B', '#4F5E73', '#D9B76A'], fonts: 'Cinzel:wght@500;600' },
-  { id: 'lua', name: 'Lua Crescente', note: 'Fantasia urbana', bg: '#1C1B22', ink: '#EDE8F2', accent: '#B9A4E8', meta: '#7FD1C7', font: "Italiana, Didot, Georgia, serif", style: 'normal', weight: 400, caps: false, spines: ['#4A2F3F', '#B9A4E8', '#2F4A5C'], fonts: 'Italiana' },
-  { id: 'rancho', name: 'Rancho', note: 'Cowboy romance', bg: '#F3EBDD', ink: '#2E2A26', accent: '#3E5C7A', meta: '#A0612F', font: "Bitter, Rockwell, Georgia, serif", style: 'italic', weight: 700, caps: false, spines: ['#9A6B4A', '#3E5C7A', '#6F7F52'], fonts: 'Bitter:ital,wght@1,600;1,700' },
-  { id: 'rinque', name: 'Rinque', note: 'Sports romance', bg: '#F4F7FA', ink: '#142235', accent: '#C8102E', meta: '#C8102E', font: "Oswald, 'Arial Narrow', sans-serif", style: 'normal', weight: 600, caps: true, spines: ['#1D3A6B', '#C8102E', '#2F4A5C'], fonts: 'Oswald:wght@500;600' },
-  { id: 'famiglia', name: 'Famiglia', note: 'Mafia romance', bg: '#121011', ink: '#F2E9DC', accent: '#C9A45C', meta: '#C9A45C', font: "'Bodoni Moda', Didot, Georgia, serif", style: 'italic', weight: 500, caps: false, spines: ['#26232A', '#5C3A4E', '#C9A45C'], fonts: 'Bodoni+Moda:ital,opsz,wght@1,6..96,500' },
-  { id: 'sombra', name: 'Sombra', note: 'Dark romance', bg: '#0B0A0B', ink: '#EDE4E4', accent: '#B3122E', meta: '#D8475E', font: "'Playfair Display', Georgia, serif", style: 'italic', weight: 800, caps: false, spines: ['#26232A', '#B3122E', '#4A2F3F'], fonts: 'Playfair+Display:ital,wght@1,700;1,800' },
+  { id: 'bookish', name: 'Bookish', note: 'Creme, vermelho e clube do livro', bg: '#F6ECE2', ink: '#3B2422', accent: '#9E2A2B', meta: '#B5485A', font: "'Bagel Fat One', 'Cooper Black', serif", style: 'normal', weight: 400, caps: false, spines: ['#9E2A2B', '#F4C9CF', '#E8D3B8'] },
+  { id: 'starlight', name: 'Starlight', note: 'Noite estrelada de cortes feéricas', bg: '#0F1430', ink: '#ECE9FB', accent: '#C9CCE8', meta: '#E7B7A5', font: "'Cinzel Decorative', Cinzel, Georgia, serif", style: 'normal', weight: 700, caps: false, spines: ['#3E3A6B', '#F2E6C9', '#E7B7A5'], fonts: 'Cinzel+Decorative:wght@700' },
+  { id: 'dragonfire', name: 'Dragonfire', note: 'Fogo de dragão e escamas', bg: '#140E0C', ink: '#F3E6D6', accent: '#E8622C', meta: '#F07A3A', font: "'Grenze Gotisch', Georgia, serif", style: 'normal', weight: 700, caps: false, spines: ['#5A2A18', '#E8622C', '#F0B04A'], fonts: 'Grenze+Gotisch:wght@600;700' },
 ];
 const THEME_KEY = 'bo.theme';
+// Temas antigos (Editorial, Noite Estrelada…) passam a ser o Bookish.
 const themeById = (id) => THEMES.find((t) => t.id === id) || THEMES[0];
 
 const loadedFonts = new Set();
@@ -85,7 +81,7 @@ function ensureFont(t) {
 function applyTheme(id) {
   const t = themeById(id);
   ensureFont(t);
-  if (t.id === 'editorial') delete document.documentElement.dataset.theme;
+  if (t.id === 'bookish') delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = t.id;
   state.theme = t.id;
   try { localStorage.setItem(THEME_KEY, t.id); } catch { /* sem armazenamento local */ }
@@ -101,20 +97,99 @@ async function chooseTheme(id) {
   if (error) toast('O tema mudou aqui, mas não consegui salvar na sua conta.', true);
 }
 
+// Estrelinha de quatro pontas do Bookish, ao lado dos títulos principais.
+const SPARK4 = '<svg class="spark4" width="14" height="20" viewBox="0 0 16 22" aria-hidden="true"><path d="M8 0l1.4 8.6L16 11l-6.6 2.4L8 22l-1.4-8.6L0 11l6.6-2.4z" fill="currentColor"/></svg>';
+const titleHTML = (text, tag = 'h1') => (state.theme === 'bookish'
+  ? `<${tag} class="disp with-sparks">${SPARK4}<span>${text}</span>${SPARK4}</${tag}>`
+  : `<${tag} class="disp">${text}</${tag}>`);
+
+const DRAGON = '<path d="M0 12c3-.6 5 .2 6.6 1.6C7.6 9.8 10 6.4 14.2 5.4c-1.4 2.2-1.6 4-.8 5.6 2.6-2.6 6-3.4 9.6-2.6-2.6 1-4.2 2.6-5 5.2 1.8.1 3.4.9 4.4 2.6-2.6-.9-5-.8-6.8.8l-1.6 2.6-1.8-1.8c-2.6.8-5 .7-6.8-.8-1.8.8-4.2.9-6-.1z"/>';
+// Enfeites do topo de cada tema.
 function ornamentHTML() {
   switch (state.theme) {
-    case 'noite': return `<svg class="orn-stars" width="190" height="120" viewBox="0 0 190 120" aria-hidden="true">
-        <path d="M110 18l2.5 9 9 2.5-9 2.5-2.5 9-2.5-9-9-2.5 9-2.5z" fill="#D9B76A"/>
-        <path d="M155 50l1.6 6 6 1.6-6 1.6-1.6 6-1.6-6-6-1.6 6-1.6z" fill="#C9CCE8"/>
-        <path d="M72 62l1.2 4.5 4.5 1.2-4.5 1.2-1.2 4.5-1.2-4.5-4.5-1.2 4.5-1.2z" fill="#C9CCE8"/>
-        <circle cx="30" cy="16" r="1.2" fill="#C9CCE8"/><circle cx="182" cy="10" r="1" fill="#C9CCE8"/>
-        <circle cx="128" cy="84" r="1" fill="#D9B76A"/><circle cx="12" cy="46" r=".9" fill="#C9CCE8"/></svg>`;
-    case 'rancho': return '<div class="orn orn-stitch" aria-hidden="true"></div>';
-    case 'rinque': return '<div class="orn orn-stripes" aria-hidden="true"><i></i><i></i></div>';
-    case 'famiglia': return '<div class="orn orn-double" aria-hidden="true"><i></i><i></i></div>';
-    case 'sombra': return '<div class="orn orn-drop" aria-hidden="true"><i></i><svg width="10" height="14" viewBox="0 0 10 14"><path d="M5 0C5 0 0 6.5 0 9.2A5 5 0 0 0 10 9.2C10 6.5 5 0 5 0z" fill="#B3122E"/></svg><i></i></div>';
+    case 'starlight': return `<svg class="orn-sky" width="200" height="150" viewBox="0 0 200 150" aria-hidden="true">
+        <path d="M128 22l2.6 9.4 9.4 2.6-9.4 2.6-2.6 9.4-2.6-9.4-9.4-2.6 9.4-2.6z" fill="#F2E6C9"/>
+        <path d="M72 6l1.6 5.8 5.8 1.6-5.8 1.6-1.6 5.8-1.6-5.8-5.8-1.6 5.8-1.6z" fill="#C9CCE8"/>
+        <path d="M172 78l1.4 5 5 1.4-5 1.4-1.4 5-1.4-5-5-1.4 5-1.4z" fill="#E7B7A5"/>
+        <path d="M72 13 L128 32 L172 85" stroke="#C9CCE8" stroke-opacity="0.35" stroke-width="0.8" fill="none" stroke-dasharray="2 3"/>
+        <circle cx="20" cy="10" r="1.2" fill="#ECE9FB"/><circle cx="190" cy="14" r="1" fill="#ECE9FB"/><circle cx="42" cy="50" r=".9" fill="#ECE9FB"/>
+        <circle cx="106" cy="74" r="1.1" fill="#F2E6C9"/><circle cx="154" cy="126" r=".9" fill="#ECE9FB"/></svg>`;
+    case 'dragonfire': return `<div class="orn-glow" aria-hidden="true"></div><svg class="orn-sky" width="200" height="150" viewBox="0 0 200 150" aria-hidden="true">
+        <g fill="#F0B04A" transform="translate(110 14) scale(1.3)">${DRAGON}</g>
+        <g fill="#E8622C" opacity=".8" transform="translate(76 64) scale(-.8 .8)">${DRAGON}</g>
+        <circle cx="178" cy="86" r="1.6" fill="#F0B04A"/><circle cx="158" cy="110" r="1.1" fill="#E8622C"/>
+        <circle cx="194" cy="60" r="1" fill="#F07A3A"/><circle cx="128" cy="96" r=".9" fill="#F0B04A"/><circle cx="40" cy="30" r="1.1" fill="#E8622C"/></svg>`;
     default: return '';
   }
+}
+
+/* ---------------- etiquetas ---------------- */
+const TAG_ICONS = {
+  heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
+  castle: 'M4 21V10h3V7h2v3h2V5l1-2 1 2v5h2V7h2v3h3v11zM10 21v-4a2 2 0 0 1 4 0v4',
+  moon: 'M15 4a7 7 0 1 0 5 11 6 6 0 0 1-5-11zM19 3l.6 1.6L21 5l-1.4.4L19 7l-.6-1.6L17 5l1.4-.4z',
+  skull: 'M12 3a7 7 0 0 0-7 7c0 2.5 1.3 4 3 5v3h8v-3c1.7-1 3-2.5 3-5a7 7 0 0 0-7-7zM9.5 11.5h.01M14.5 11.5h.01M10.5 18v3M13.5 18v3',
+  boot: 'M8 3h6v9l5 3c1.5.9 2 2 2 3v1H5v-4l2-2zM5 21h16M8 7h6',
+  stick: 'M7 3l5 13h7v3h-9L4 4zM5 21h3',
+  rose: 'M12 9a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM12 9v12M12 14c-3 0-5-2-5-4M12 17c3 0 5-2 5-4',
+  pepper: 'M8 9c4-1 10 1 10 7 0 3-3 5-6 4S6 15 8 9zM8 9c-1-2 0-4 2-5',
+  swords: 'M4 4l9 9M20 4l-9 9M6 15l3 3M18 15l-3 3M12 21s-3-1.8-3-4a1.6 1.6 0 0 1 3-1 1.6 1.6 0 0 1 3 1c0 2.2-3 4-3 4z',
+  cup: 'M4 9h12v4a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM16 10h2a2 2 0 0 1 0 4h-2M8 3c0 2 2 2 2 4M12 3c0 2 2 2 2 4M5 21h10',
+  night: 'M14 3a8 8 0 1 0 7 11 7 7 0 0 1-7-11zM6 14v6M4.5 20h3M6 12.5c.8-.8.8-1.7 0-2.5-.8.8-.8 1.7 0 2.5z',
+  bookmark: 'M6 3h12v18l-6-4-6 4z',
+};
+const BASE_TAGS = [
+  { id: 'romance', label: 'Romance', bg: '#F4C9CF', ink: '#A12F4B', icon: 'heart' },
+  { id: 'romantasia', label: 'Romantasia', bg: '#DCCDF0', ink: '#5B3F8C', icon: 'castle' },
+  { id: 'fantasia', label: 'Fantasia', bg: '#C8DCEF', ink: '#2E5A87', icon: 'moon' },
+  { id: 'dark', label: 'Dark Romance', bg: '#E9C2CB', ink: '#6E1A33', icon: 'skull' },
+  { id: 'cowboy', label: 'Cowboy', bg: '#F4D2BA', ink: '#8F4423', icon: 'boot' },
+  { id: 'sports', label: 'Sports', bg: '#CFE4D2', ink: '#2F6B47', icon: 'stick' },
+  { id: 'mafia', label: 'Mafia', bg: '#362C30', ink: '#E2BC6A', icon: 'rose' },
+  { id: 'smut', label: 'SMUT', bg: '#E5C5EE', ink: '#7B2F8F', icon: 'pepper' },
+  { id: 'enemies', label: 'Enemies to Lovers', bg: '#F2C1BD', ink: '#A12B2B', icon: 'swords' },
+  { id: 'cozy', label: 'Cozy', bg: '#F0E2C6', ink: '#7E5427', icon: 'cup' },
+  { id: 'madrugada', label: 'Leitura da madrugada', bg: '#2E3566', ink: '#E6E1FF', icon: 'night' },
+];
+// Cores para as etiquetas que ela mesma cria.
+const TAG_PALETTE = [['#F4C9CF', '#A12F4B'], ['#DCCDF0', '#5B3F8C'], ['#C8DCEF', '#2E5A87'], ['#CFE4D2', '#2F6B47'], ['#F4D2BA', '#8F4423'], ['#F0E2C6', '#7E5427'], ['#E5C5EE', '#7B2F8F'], ['#362C30', '#E2BC6A'], ['#2E3566', '#E6E1FF']];
+const allTags = () => [...BASE_TAGS, ...((state.session?.user?.user_metadata?.customTags) || [])];
+const tagById = (id) => allTags().find((t) => t.id === id);
+function ticketHTML(t, { size = 'mini', action = '', pressed = null, removable = false } = {}) {
+  const path = TAG_ICONS[t.icon] || TAG_ICONS.bookmark;
+  const tag = action ? 'button' : 'span';
+  return `<${tag} class="ticket ${size}" style="--tk-bg:${esc(t.bg)};--tk-ink:${esc(t.ink)}" ${action ? `data-action="${action}" data-value="${esc(t.id)}"` : ''} ${pressed !== null ? `aria-pressed="${pressed}"` : ''} ${removable ? `aria-label="Remover etiqueta ${esc(t.label)}"` : ''}>
+    <span class="tk-main"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${path}"/></svg><span class="tk-label">${esc(t.label)}</span></span><span class="tk-stub" aria-hidden="true"></span></${tag}>`;
+}
+
+/* ---------------- carimbos do Obsession Level ---------------- */
+// Cada nível tem um desenho inspirado no emoji e uma cor de tinta de carimbo.
+const STAMP_ART = {
+  obsessed: { ink: '#B3202E', art: '<path d="M32 46S18 37.6 18 28a7.5 7.5 0 0 1 14-3.6A7.5 7.5 0 0 1 46 28c0 9.6-14 18-14 18z" fill="currentColor" opacity=".18"/><path d="M32 46S18 37.6 18 28a7.5 7.5 0 0 1 14-3.6A7.5 7.5 0 0 1 46 28c0 9.6-14 18-14 18z"/><path d="M27 20c-2-3 0-6 2-7-.4 2 .8 3 2 3.4 0-3 2-5.4 4-6.4-.6 3 1.6 4.6 2 7"/>' },
+  destruiu: { ink: '#4E2A52', art: '<path d="M32 16a12 12 0 0 0-12 12c0 4.2 2.2 6.8 5 8.4V42h14v-5.6c2.8-1.6 5-4.2 5-8.4a12 12 0 0 0-12-12z" fill="currentColor" opacity=".14"/><path d="M32 16a12 12 0 0 0-12 12c0 4.2 2.2 6.8 5 8.4V42h14v-5.6c2.8-1.6 5-4.2 5-8.4a12 12 0 0 0-12-12z"/><circle cx="27.5" cy="28" r="2.6"/><circle cx="36.5" cy="28" r="2.6"/><path d="M29.5 42v-4M34.5 42v-4"/><path d="M27.5 32c-1 2.4-1.6 4-.4 5.2"/>' },
+  amei: { ink: '#C2456A', art: '<circle cx="32" cy="31" r="14" fill="currentColor" opacity=".14"/><circle cx="32" cy="31" r="14"/><path d="M27 29s-3.6-2.2-3.6-4.6a1.9 1.9 0 0 1 3.6-.8 1.9 1.9 0 0 1 3.6.8C30.6 26.8 27 29 27 29zM37 29s-3.6-2.2-3.6-4.6a1.9 1.9 0 0 1 3.6-.8 1.9 1.9 0 0 1 3.6.8C40.6 26.8 37 29 37 29z" fill="currentColor"/><path d="M26 35c3.6 4 8.4 4 12 0"/>' },
+  gostei: { ink: '#D0697A', art: '<circle cx="32" cy="31" r="14" fill="currentColor" opacity=".14"/><circle cx="32" cy="31" r="14"/><path d="M26 28c1.2-1.4 3-1.4 4.2 0M33.8 28c1.2-1.4 3-1.4 4.2 0M27 35c2.8 2.6 7.2 2.6 10 0"/><path d="M47 19s-2.4-1.5-2.4-3.1a1.3 1.3 0 0 1 2.4-.5 1.3 1.3 0 0 1 2.4.5c0 1.6-2.4 3.1-2.4 3.1zM17 42s-2-1.2-2-2.6a1.1 1.1 0 0 1 2-.4 1.1 1.1 0 0 1 2 .4c0 1.4-2 2.6-2 2.6z" fill="currentColor"/>' },
+  bonzinho: { ink: '#6E7B3E', art: '<circle cx="32" cy="31" r="14" fill="currentColor" opacity=".12"/><circle cx="32" cy="31" r="14"/><circle cx="27" cy="28" r="1.6" fill="currentColor"/><circle cx="37" cy="28" r="1.6" fill="currentColor"/><path d="M27.5 35.5c2.6 1.8 6.4 1.8 9 0"/>' },
+  gastei: { ink: '#7C6F66', art: '<circle cx="32" cy="31" r="14" fill="currentColor" opacity=".1"/><circle cx="32" cy="31" r="14"/><path d="M25.5 27.5h4M34.5 27.5h4M28 36.5h8"/><path d="M44 19v-4h4M44 15l3 3"/><circle cx="46" cy="17" r="5"/>' },
+};
+// Carimbo redondo: nome em volta, desenho no meio.
+function stampHTML(id, { size = 132 } = {}) {
+  const o = OBSESSION.find((x) => x.id === id);
+  const s = STAMP_ART[id];
+  if (!o || !s) {
+    return `<span class="stamp empty" style="width:${size}px;height:${size}px"><span>obsession<br>level<br><b>toque para carimbar</b></span></span>`;
+  }
+  const label = o.label.replace(/[^\p{L}\p{N} ]/gu, '').trim().toUpperCase();
+  let ring = '';
+  while (ring.length < 30) ring += `${label} ✦ `;
+  const uid = `st-${id}-${size}`;
+  return `<svg class="stamp" width="${size}" height="${size}" viewBox="0 0 64 64" role="img" aria-label="Obsession level: ${esc(o.label)}" style="color:${s.ink}">
+    <defs><path id="${uid}" d="M32 32m-24 0a24 24 0 1 1 48 0a24 24 0 1 1 -48 0"/></defs>
+    <circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <circle cx="32" cy="32" r="27.6" fill="none" stroke="currentColor" stroke-width=".6" stroke-dasharray="1 1.6"/>
+    <text font-family="'Courier Prime', monospace" font-size="5" font-weight="700" fill="currentColor"><textPath href="#${uid}" textLength="148" lengthAdjust="spacing">${esc(ring.trim())}</textPath></text>
+    <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 1)">${s.art}</g>
+  </svg>`;
 }
 
 /* ---------------- estado ---------------- */
@@ -126,7 +201,8 @@ const state = {
   query: '',
   sheet: null, // { kind: 'book'|'add'|'cover'|'themes', id?, ... }
   dd: null, // menu suspenso aberto
-  theme: 'editorial',
+  theme: 'bookish',
+  bbs: [], // book boyfriends, na ordem do ranking
   view: 'library', // 'library' | 'shelf'
   shelfYear: null,
   goalEdit: null, // { value } enquanto edita a meta
@@ -332,9 +408,13 @@ async function searchBooks(q, { lang = '', max = 20 } = {}) {
 
 /* ---------------- dados ---------------- */
 async function loadBooks() {
-  const { data, error } = await sb.from('books').select('*').order('created_at', { ascending: true });
+  const [{ data, error }, bb] = await Promise.all([
+    sb.from('books').select('*').order('created_at', { ascending: true }),
+    sb.from('book_boyfriends').select('*').order('rank', { ascending: true }).order('created_at', { ascending: true }),
+  ]);
   if (error) { toast('Não consegui carregar os livros. Confira a internet e recarregue.', true); return; }
   state.books = data || [];
+  state.bbs = bb.error ? [] : (bb.data || []);
   state.loaded = true;
   render();
   // Capas que ainda apontam para sites externos são copiadas para o Storage em segundo plano.
@@ -657,13 +737,14 @@ function visibleBooks() {
   let list = state.books;
   if (state.filter.type === 'status') list = list.filter((b) => b.status === state.filter.value);
   else if (state.filter.type === 'nocover') list = list.filter((b) => !b.cover_url);
+  else if (state.filter.type === 'tag') list = list.filter((b) => (b.tags || []).includes(state.filter.value));
   else {
     const c = COLLECTIONS.find((x) => x.id === state.filter.value);
     list = list.filter(c.test);
   }
   if (q) {
     list = state.books.filter((b) =>
-      [b.title, b.author, b.series, ...(b.tropes || []), ...(b.genres || []), ...(b.characters || []), ...(b.book_boyfriends || [])]
+      [b.title, b.author, b.series, ...(b.tags || []).map((t) => tagById(t)?.label || t), ...(b.characters || []), ...bbsOf(b.id).map((x) => x.name)]
         .some((f) => norm(f).includes(q)));
   }
   return [...list].sort((a, b) => {
@@ -685,20 +766,18 @@ function renderLibrary() {
   const total = state.books.length;
   return `
   <div class="page">
-    ${state.theme === 'noite' ? ornamentHTML() : ''}
+    ${ornamentHTML()}
     <header class="lib-head">
       <div>
-        <span class="eyebrow">${total} ${total === 1 ? 'livro' : 'livros'}</span>
-        <h1>Library</h1>
+        <span class="eyebrow">${total} ${total === 1 ? 'livro' : 'livros'} · ${THEME_TAGLINE[state.theme] || ''}</span>
+        ${titleHTML('Library')}
       </div>
       <div class="actions">
-        ${state.theme === 'lua' ? ic.moon : ''}
         <button class="iconbtn" data-action="themes" aria-label="Temas">${ic.palette}</button>
         <button class="iconbtn" data-action="logout" aria-label="Sair da conta">${ic.out}</button>
         <button class="fab" data-action="add" aria-label="Adicionar livro">${ic.plus}</button>
       </div>
     </header>
-    ${state.theme !== 'noite' ? ornamentHTML() : ''}
 
     <label class="search" for="q">${ic.search}
       <input id="q" type="search" placeholder="Buscar título, autora ou personagem" value="${esc(state.query)}" autocomplete="off">
@@ -727,7 +806,9 @@ function libBodyHTML() {
       ? STATUSES.find((s) => s.id === state.filter.value).tab
       : state.filter.type === 'nocover'
         ? 'Sem capa'
-        : COLLECTIONS.find((c) => c.id === state.filter.value).label;
+        : state.filter.type === 'tag'
+          ? esc(tagById(state.filter.value)?.label || 'Etiqueta')
+          : COLLECTIONS.find((c) => c.id === state.filter.value).label;
   const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
   const showBtn = state.filter.type === 'nocover'
     ? ''
@@ -767,17 +848,59 @@ function libBodyHTML() {
         ${COLLECTIONS.map((c) => {
           const n = state.books.filter(c.test).length;
           const on = !state.query && state.filter.type === 'collection' && state.filter.value === c.id;
-          return `<button class="coll ${c.cls}" data-action="collection" data-value="${c.id}" aria-pressed="${on}">
-            <span class="t">${c.label}</span><span class="n">${n ? `${n} ${n === 1 ? 'livro' : 'livros'}` : 'para preencher'}</span></button>`;
+          const count = c.id === 'boyfriends'
+            ? (state.bbs.length ? `${state.bbs.length} no ranking` : 'para preencher')
+            : n ? `${n} ${n === 1 ? 'livro' : 'livros'}` : 'para preencher';
+          return `<button class="coll ${c.cls}" data-action="${c.id === 'boyfriends' ? 'bbs' : 'collection'}" data-value="${c.id}" ${c.id === 'boyfriends' ? '' : `aria-pressed="${on}"`}>
+            <span class="cb"><span class="t">${c.label}</span><span class="n">${count}</span></span><span class="stub" aria-hidden="true"></span></button>`;
         }).join('')}
       </div>
       <button class="hs-btn next" data-action="hs" data-dir="1" aria-label="Ver mais coleções">›</button>
     </div>
 
+    ${tagStripHTML()}
+
     ${banner}
 
     <div class="section-line"><h2>${filterLabel}</h2><span>${list.length} ${list.length === 1 ? 'livro' : 'livros'}</span></div>
     ${body}`;
+}
+
+// Faixa de etiquetas da Library: só as que já estão em algum livro.
+function tagStripHTML() {
+  const used = allTags().map((t) => ({ t, n: state.books.filter((b) => (b.tags || []).includes(t.id)).length })).filter((x) => x.n);
+  if (!used.length) return '';
+  const cur = !state.query && state.filter.type === 'tag' ? state.filter.value : null;
+  return `<div class="hs-wrap">
+    <button class="hs-btn prev" data-action="hs" data-dir="-1" aria-label="Ver etiquetas anteriores">‹</button>
+    <div class="tag-strip hstrip" aria-label="Filtrar por etiqueta">
+      ${used.map(({ t }) => ticketHTML(t, { action: 'tag-filter', pressed: cur ? cur === t.id : true })).join('')}
+    </div>
+    <button class="hs-btn next" data-action="hs" data-dir="1" aria-label="Ver mais etiquetas">›</button>
+  </div>`;
+}
+const THEME_TAGLINE = { bookish: 'clube de leitura', starlight: 'sob as estrelas', dragonfire: 'voe ou morra' };
+const bbsOf = (bookId) => state.bbs.filter((x) => x.book_id === bookId);
+
+// Ranking: o primeiro da lista é o nº 1. Guarda as novas posições no banco.
+async function saveRanking(list) {
+  const before = state.bbs;
+  state.bbs = list.map((x, i) => ({ ...x, rank: i + 1 }));
+  render();
+  const changed = state.bbs.filter((x) => before.find((y) => y.id === x.id)?.rank !== x.rank);
+  const res = await Promise.all(changed.map((x) => sb.from('book_boyfriends').update({ rank: x.rank }).eq('id', x.id)));
+  if (res.some((r) => r.error)) { state.bbs = before; render(); toast('Não consegui salvar a nova ordem.', true); }
+}
+async function addBB(bookId, name) {
+  if (state.bbs.some((x) => x.book_id === bookId && norm(x.name) === norm(name))) { toast(`${name} já está no ranking`); return false; }
+  const rank = state.bbs.reduce((m, x) => Math.max(m, x.rank || 0), 0) + 1;
+  const { data, error } = await sb.from('book_boyfriends').insert({ book_id: bookId, name, rank }).select().single();
+  if (error) { toast('Não consegui adicionar ao ranking.', true); return false; }
+  state.bbs.push(data);
+  if (state.sheet) state.sheet.keepScroll = true;
+  render();
+  toast(`${name} entrou no ranking em #${state.bbs.length}`);
+  return true;
 }
 
 function renderNav() {
@@ -797,7 +920,7 @@ const SHELF_STYLES = [
   { id: 'flutuante', label: 'Flutuante' },
   { id: 'luzinhas', label: 'Luzinhas' },
 ];
-const DARK_THEMES = ['noite', 'lua', 'famiglia', 'sombra'];
+const DARK_THEMES = ['starlight', 'dragonfire'];
 const meta = () => state.session?.user?.user_metadata || {};
 const thisYear = () => new Date().getFullYear();
 const bookYear = (b) => Number((b.finished_at || b.created_at || '').slice(0, 4)) || thisYear();
@@ -808,7 +931,7 @@ function goalFor(year) {
 function shelfStyle() {
   const s = meta().shelfStyle;
   if (SHELF_STYLES.some((x) => x.id === s)) return s;
-  const dark = DARK_THEMES.includes(state.theme) || (state.theme === 'editorial' && matchMedia('(prefers-color-scheme: dark)').matches);
+  const dark = DARK_THEMES.includes(state.theme);
   return dark ? 'luzinhas' : 'classica';
 }
 async function saveMeta(patch) {
@@ -1153,18 +1276,60 @@ function chipList(b, field, placeholder) {
   </div>`;
 }
 
+function tagsSectionHTML(b) {
+  const mine = (b.tags || []).map(tagById).filter(Boolean);
+  const open = state.sheet.tagPick;
+  return `<section class="tags-sec" aria-label="Etiquetas">
+    <div class="tags center">
+      ${mine.map((t) => ticketHTML(t, { size: 'mid', action: 'tag-pick-open' })).join('')}
+      <button class="ticket add" data-action="tag-pick-open" aria-expanded="${!!open}">${open ? 'fechar' : '+ etiqueta'}</button>
+    </div>
+    ${open ? `<div class="tag-picker">
+      <span class="label">Toque para colar ou tirar</span>
+      <div class="tags">${allTags().map((t) => ticketHTML(t, { size: 'mid', action: 'tag-toggle', pressed: (b.tags || []).includes(t.id) })).join('')}</div>
+      <form id="tagForm" class="tag-form">
+        <span class="label">Criar a minha etiqueta</span>
+        <input class="input" name="name" maxlength="28" placeholder="nome da etiqueta" autocomplete="off" aria-label="Nome da nova etiqueta" value="${esc(state.sheet.newTag || '')}">
+        <div class="swatches" role="radiogroup" aria-label="Cor da etiqueta">
+          ${TAG_PALETTE.map(([bg, ink], i) => `<button type="button" class="swatch" role="radio" aria-checked="${(state.sheet.newTagColor || 0) === i}" aria-label="Cor ${i + 1}" data-action="tag-color" data-value="${i}" style="background:${bg};color:${ink}">a</button>`).join('')}
+        </div>
+        <button class="btn small dark" type="submit">Criar e colar</button>
+      </form>
+    </div>` : ''}
+  </section>`;
+}
+
+function stampPickerHTML(b) {
+  return `<div class="stamp-picker" role="group" aria-label="Escolher obsession level">
+    ${OBSESSION.map((o) => `<button class="stamp-opt" data-action="obs-pick" data-value="${o.id}" aria-pressed="${b.obsession === o.id}">${stampHTML(o.id, { size: 76 })}<span>${esc(o.label)}</span></button>`).join('')}
+    <button class="stamp-opt none" data-action="obs-pick" data-value="" aria-pressed="${!b.obsession}"><span class="stamp empty" style="width:76px;height:76px"><span>sem<br>carimbo</span></span><span>Sem nível</span></button>
+  </div>`;
+}
+
+function bbSectionHTML(b) {
+  const list = bbsOf(b.id);
+  return `<section class="bb-sec" aria-label="Book boyfriends deste livro">
+    <div class="bb-sec-head"><span class="label">Book boyfriends deste livro</span>${state.bbs.length ? '<button class="linkbtn small" data-action="bbs">ver ranking</button>' : ''}</div>
+    ${list.length ? `<ul class="bb-mini">${list.map((x) => `<li><span class="bb-rank">#${state.bbs.indexOf(x) + 1}</span><span class="bb-name">${esc(x.name)}</span>
+      <button class="x" data-action="bb-del" data-id="${x.id}" aria-label="Tirar ${esc(x.name)} do ranking">×</button></li>`).join('')}</ul>` : ''}
+    <input class="bb-input" id="bbNew" data-bb="${b.id}" placeholder="+ adicionar book boyfriend" aria-label="Adicionar book boyfriend" enterkeyhint="done" autocomplete="off">
+  </section>`;
+}
+
 function renderBook(b) {
   const pct = b.pages ? Math.min(100, Math.round(((b.current_page || 0) / b.pages) * 100)) : 0;
   const confirming = state.sheet.confirmDelete;
+  const st = STATUSES.find((s) => s.id === b.status)?.one || '';
+  const lang = LANGUAGES.find((l) => l.id === b.language)?.label.toLowerCase();
   return `
   <div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(cleanTitle(b.title))}"><div class="sheet-inner">
     <div class="sheet-top">
-      <button class="iconbtn back" data-action="close" aria-label="Voltar para a Library">${ic.back}</button>
-      <span class="eyebrow">${esc(STATUSES.find((s) => s.id === b.status)?.one || '')}${b.status === 'lido' && b.finished_at ? ' · ' + fmtDate(b.finished_at) : ''}</span>
+      <button class="iconbtn back" data-action="close" aria-label="Voltar">${ic.back}</button>
+      <span class="eyebrow">${esc(st)}${b.status === 'lido' && b.finished_at ? ' · ' + fmtDate(b.finished_at) : ''}</span>
     </div>
 
     <div class="hero">
-      ${coverHTML(b, 'lg')}
+      <div class="hero-cover">${coverHTML(b, 'lg')}</div>
       ${coverSource(b) ? `<span class="cover-src">${coverSource(b)}</span>` : ''}
       <div class="covertools">
         <button class="linkbtn" data-action="cover">${b.cover_url ? 'Trocar capa' : 'Buscar capa'}</button>
@@ -1176,23 +1341,50 @@ function renderBook(b) {
       <span class="by">${esc(b.author || 'Autora desconhecida')}${b.series ? ` · ${esc(b.series)}${b.series_position ? ', ' + esc(b.series_position) : ''}` : ''}</span>
     </div>
 
+    ${tagsSectionHTML(b)}
+
     ${b.status === 'lendo' ? `
     <div class="progress">
       <div class="nums"><span class="pct">${pct}%</span><span class="pg">${b.current_page || 0} / ${b.pages || '?'}</span></div>
       <div class="bar"><div style="width:${pct}%"></div></div>
     </div>` : ''}
 
-    <div class="stats3">
-      <div><span class="label">Rating</span>${ratingHTML(b)}</div>
-      <div><span class="label">Obsession</span>
-        ${ddHTML('obsession', b.obsession, [...OBSESSION, { id: '', label: 'Sem nível' }], { cls: 'dd-obs', label: 'Obsession level' })}</div>
-      <div><span class="label">Spicy</span>${spicyHTML(b)}</div>
-    </div>
+    <section class="notes" aria-label="Notas">
+      <div class="notes-l">
+        <span class="label">Nota</span>${ratingHTML(b)}
+        <span class="label sp">Spicy</span>${spicyHTML(b)}
+      </div>
+      <button class="stamp-btn" data-action="stamp-open" aria-expanded="${!!state.sheet.stampPick}" aria-label="Obsession level: ${esc(obsLabel(b.obsession) || 'sem nível')}. Toque para trocar">${stampHTML(b.obsession, { size: 128 })}</button>
+      ${state.sheet.stampPick ? stampPickerHTML(b) : ''}
+    </section>
 
-    <div class="marked">
-      <label for="why">Por que isso me marcou?</label>
-      <textarea id="why" data-field="why_it_marked" rows="2" placeholder="Em uma frase, o que esse livro fez com você">${esc(b.why_it_marked || '')}</textarea>
-    </div>
+    <section class="lcard" aria-label="Cartão de biblioteca">
+      <svg class="lcard-ribbon" width="86" height="120" viewBox="0 0 86 120" aria-hidden="true">
+        <circle cx="44" cy="34" r="6" fill="none" stroke="#3B2422" stroke-width="2"/>
+        <path d="M44 34c-10-18-30-22-34-12s16 12 34 12c18 0 34-4 30-14s-24-6-30 14" fill="none" stroke="#C97C86" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M40 40c-6 18-14 30-22 40M46 40c-2 16-4 28-10 38" fill="none" stroke="#C97C86" stroke-width="2" stroke-linecap="round"/>
+        <rect x="4" y="80" width="30" height="38" rx="3" transform="rotate(-8 19 99)" fill="#FBF2E4" stroke="#3B2422" stroke-width="1.8"/>
+        <path d="M19 104s-6-3.6-6-8a3.4 3.4 0 0 1 6-2 3.4 3.4 0 0 1 6 2c0 4.4-6 8-6 8z" transform="rotate(-8 19 99)" fill="none" stroke="#C97C86" stroke-width="1.8"/>
+      </svg>
+      <div class="lcard-head"><span class="lcard-title">LIBRARY CARD</span>
+        <svg width="20" height="18" viewBox="0 0 24 22" aria-hidden="true"><path d="M12 21s-9-5.6-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.4-9 12-9 12z" fill="none" stroke="#C97C86" stroke-width="2"/></svg></div>
+      <span class="lcard-sub">book lover</span>
+      <div class="lcard-rows">
+        <div class="lrow"><span>TÍTULO:</span><span class="hand ttl">${esc(cleanTitle(b.title))}</span></div>
+        <div class="lrow"><label for="f-ini">COMECEI EM:</label><input id="f-ini" class="hand" type="date" data-field="started_at" value="${b.started_at || ''}"></div>
+        <div class="lrow"><label for="f-fim">TERMINEI EM:</label><input id="f-fim" class="hand" type="date" data-field="finished_at" value="${b.finished_at || ''}"></div>
+        <div class="lrow"><label for="f-pages">PÁGINAS · IDIOMA:</label><span class="lrow-pair">
+          <input id="f-pages" class="hand num" type="number" inputmode="numeric" min="0" placeholder="—" data-field="pages" value="${b.pages ?? ''}"><span class="hand dot">·</span>
+          ${ddHTML('language', b.language, LANGUAGES, { placeholder: '—', cls: 'dd-right dd-hand', label: 'Idioma' })}</span></div>
+      </div>
+      <div class="lcard-why">
+        <label for="why">POR QUE ISSO ME MARCOU?</label>
+        <textarea id="why" class="hand" data-field="why_it_marked" rows="4" placeholder="escreva aqui, do seu jeito, o que esse livro fez com você">${esc(b.why_it_marked || '')}</textarea>
+      </div>
+      <span class="lcard-seal" aria-hidden="true">BOOKED &amp;<br>OBSESSED<br>♥<br>${esc(st.toUpperCase())}</span>
+    </section>
+
+    ${bbSectionHTML(b)}
 
     <div class="rows">
       <div class="row"><label for="f-title">Título</label><div class="ctrl"><input id="f-title" type="text" data-field="title" value="${esc(b.title)}" autocomplete="off"></div></div>
@@ -1200,16 +1392,9 @@ function renderBook(b) {
       <div class="row"><span class="label-plain">Status</span><div class="ctrl">
         ${ddHTML('status', b.status, STATUSES.map((s) => ({ id: s.id, label: s.one })), { cls: 'dd-right', label: 'Status' })}</div></div>
       ${b.status === 'lendo' ? `<div class="row"><label for="f-cur">Página atual</label><div class="ctrl"><input id="f-cur" class="num" type="number" inputmode="numeric" min="0" data-field="current_page" value="${b.current_page ?? ''}"></div></div>` : ''}
-      <div class="row"><label for="f-pages">Páginas</label><div class="ctrl"><input id="f-pages" class="num" type="number" inputmode="numeric" min="0" data-field="pages" value="${b.pages ?? ''}"></div></div>
-      ${b.status === 'lido' ? `<div class="row"><label for="f-fim">Terminei em</label><div class="ctrl"><input id="f-fim" type="date" data-field="finished_at" value="${b.finished_at || ''}"></div></div>` : ''}
-      <div class="row"><span class="label-plain">Idioma</span><div class="ctrl">
-        ${ddHTML('language', b.language, LANGUAGES, { placeholder: '—', cls: 'dd-right', label: 'Idioma' })}</div></div>
       <div class="row"><label for="f-series">Série</label><div class="ctrl"><input id="f-series" type="text" data-field="series" placeholder="nome da série" value="${esc(b.series || '')}"></div></div>
       <div class="row"><label for="f-pos">Livro nº</label><div class="ctrl"><input id="f-pos" class="num" type="number" inputmode="decimal" step="0.5" min="0" data-field="series_position" value="${b.series_position ?? ''}"></div></div>
-      <div class="row stack"><span class="label-plain label">Gênero</span>
-        <div class="chips">${GENRES.map((g) => `<button class="chip" data-action="genre" data-value="${esc(g)}" aria-pressed="${(b.genres || []).includes(g)}">${g}</button>`).join('')}</div></div>
       <div class="row stack"><span class="label">Personagens</span>${chipList(b, 'characters', '+ personagem')}</div>
-      <div class="row stack"><span class="label">Book boyfriends</span>${chipList(b, 'book_boyfriends', '+ book boyfriend')}</div>
       <label class="switch" for="f-reler">Quero reler<input id="f-reler" type="checkbox" data-field="want_reread" ${b.want_reread ? 'checked' : ''}></label>
       <label class="switch" for="f-nao">Não indicaria<input id="f-nao" type="checkbox" data-field="wouldnt_recommend" ${b.wouldnt_recommend ? 'checked' : ''}></label>
     </div>
@@ -1221,6 +1406,53 @@ function renderBook(b) {
              <button class="btn small dark" data-action="delete-yes">Excluir</button></div>`
         : '<button class="linkbtn" data-action="delete">Excluir livro</button>'}
     </div>
+  </div></div>`;
+}
+
+/* ---------------- render: book boyfriends ---------------- */
+function renderBBs() {
+  const sh = state.sheet;
+  const list = state.bbs;
+  const books = [...state.books].sort((a, b) => cleanTitle(a.title).localeCompare(cleanTitle(b.title)));
+  return `
+  <div class="sheet bb-page" role="dialog" aria-modal="true" aria-label="Book boyfriends"><div class="sheet-inner">
+    <div class="sheet-top">
+      <button class="iconbtn back" data-action="close" aria-label="Voltar para a Library">${ic.back}</button>
+      <span class="eyebrow">${list.length} no ranking</span>
+    </div>
+    <header class="bb-head">
+      <h2 class="sheet-title">Book<br>Boyfriends</h2>
+      <span class="bb-sub">meu ranking oficial ♥</span>
+      <svg class="bb-heart" width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M32 54S10 41 10 25a11 11 0 0 1 22-4 11 11 0 0 1 22 4c0 16-22 29-22 29z" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M50 8l1.4 5 5 1.4-5 1.4-1.4 5-1.4-5-5-1.4 5-1.4z" fill="currentColor"/>
+        <path d="M8 46l1 3.4 3.4 1-3.4 1-1 3.4-1-3.4-3.4-1 3.4-1z" fill="var(--meta)"/>
+      </svg>
+    </header>
+    ${list.length ? `<p class="hint">No computador, segure e arraste para mudar a ordem. No celular, use as setinhas.</p>
+    <ol class="bb-list">
+      ${list.map((x, i) => {
+        const b = byId(x.book_id);
+        return `<li class="bb-row${i === 0 ? ' top' : ''}" draggable="true" data-bb-id="${x.id}">
+          <span class="bb-rank" aria-hidden="true">${i + 1}</span>
+          <button class="bb-info" data-action="bb-open" data-id="${x.book_id}">
+            <span class="bb-name">${esc(x.name)}${i === 0 ? '<svg width="13" height="12" viewBox="0 0 24 22" role="img" aria-label="Meu número 1"><path d="M12 21s-9-5.6-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.4-9 12-9 12z" fill="currentColor"/></svg>' : ''}</span>
+            <span class="bb-book">${esc(b ? cleanTitle(b.title) : '')}${b?.author ? ' · ' + esc(b.author) : ''}</span>
+          </button>
+          ${b ? coverHTML(b, 'xs') : ''}
+          <span class="bb-arrows">
+            <button data-action="bb-move" data-id="${x.id}" data-dir="-1" aria-label="Subir ${esc(x.name)}" ${i === 0 ? 'disabled' : ''}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+            <button data-action="bb-move" data-id="${x.id}" data-dir="1" aria-label="Descer ${esc(x.name)}" ${i === list.length - 1 ? 'disabled' : ''}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          </span>
+        </li>`;
+      }).join('')}
+    </ol>` : '<div class="empty"><span class="serif">Nenhum book boyfriend ainda.</span>Adicione o primeiro aqui ou na ficha do livro.</div>'}
+    ${sh.addOpen ? `<form id="bbForm" class="bb-form">
+        <input class="input" name="name" id="bbName" maxlength="120" placeholder="nome do personagem" autocomplete="off" aria-label="Nome do book boyfriend" value="${esc(sh.bbName || '')}">
+        ${ddHTML('bb-book', sh.bbBook, books.map((b) => ({ id: b.id, label: cleanTitle(b.title) })), { cls: 'dd-field', label: 'Livro', placeholder: 'de qual livro?' })}
+        <div class="goal-actions"><button type="button" class="btn small" data-action="bb-add-toggle">Cancelar</button><button type="submit" class="btn small dark">Adicionar</button></div>
+      </form>`
+      : '<button class="dashed-btn" data-action="bb-add-toggle">+ adicionar book boyfriend</button>'}
   </div></div>`;
 }
 
@@ -1374,6 +1606,7 @@ function render() {
   else if (state.sheet?.kind === 'add') sheet = renderAdd();
   else if (state.sheet?.kind === 'cover') { const b = byId(state.sheet.id); sheet = b ? renderCover(b) : ''; }
   else if (state.sheet?.kind === 'themes') sheet = renderThemes();
+  else if (state.sheet?.kind === 'bbs') sheet = renderBBs();
 
   const main = state.view === 'shelf' ? renderShelf() : renderLibrary();
   app.innerHTML = `<div class="shell" ${sheet ? 'aria-hidden="true"' : ''}>${main}</div>${renderNav()}${sheet}`;
@@ -1505,6 +1738,7 @@ document.addEventListener('click', async (e) => {
       if (k === 'p-status') { sheet.pStatus = v; render(); break; }
       if (k === 'q-status') { sheet.qStatus = v; render(); break; }
       if (k === 'm-status') { sheet.mStatus = v; render(); break; }
+      if (k === 'bb-book') { sheet.bbBook = v; render(); break; }
       if (b && ['obsession', 'status', 'language'].includes(k)) setField(b, k, v);
       else render();
       break;
@@ -1566,6 +1800,12 @@ document.addEventListener('click', async (e) => {
       state.filter = state.filter.type === 'collection' && state.filter.value === v ? { type: 'status', value: 'lido' } : { type: 'collection', value: v };
       render(); break;
     }
+    case 'tag-filter': {
+      const v = el.dataset.value;
+      state.query = '';
+      state.filter = state.filter.type === 'tag' && state.filter.value === v ? { type: 'status', value: 'lido' } : { type: 'tag', value: v };
+      render(); break;
+    }
     case 'fetch-covers': fetchMissingCovers(); break;
     case 'show-nocover':
       state.query = ''; state.filter = { type: 'nocover' }; render();
@@ -1574,7 +1814,57 @@ document.addEventListener('click', async (e) => {
     case 'open':
       state.sheet = { kind: 'book', id: el.dataset.id }; render(); document.querySelector('.sheet')?.scrollTo(0, 0); break;
     case 'close':
+      if (sheet?.from === 'bbs') { state.sheet = { kind: 'bbs' }; render(); break; }
       state.sheet = null; render(); checkVersion(); break;
+    case 'bbs':
+      state.sheet = { kind: 'bbs' }; render(); document.querySelector('.sheet')?.scrollTo(0, 0); break;
+    case 'bb-open':
+      state.sheet = { kind: 'book', id: el.dataset.id, from: 'bbs' }; render(); document.querySelector('.sheet')?.scrollTo(0, 0); break;
+    case 'bb-add-toggle':
+      sheet.addOpen = !sheet.addOpen; sheet.keepScroll = true; render();
+      if (sheet.addOpen) document.getElementById('bbName')?.focus();
+      break;
+    case 'bb-move': {
+      const i = state.bbs.findIndex((x) => x.id === el.dataset.id);
+      const j = i + Number(el.dataset.dir);
+      if (i < 0 || j < 0 || j >= state.bbs.length) break;
+      const list = [...state.bbs];
+      [list[i], list[j]] = [list[j], list[i]];
+      sheet.keepScroll = true;
+      saveRanking(list);
+      // O foco segue o personagem que mudou de lugar.
+      document.querySelector(`[data-bb-id="${el.dataset.id}"] [data-dir="${el.dataset.dir}"]:not(:disabled)`)?.focus();
+      break;
+    }
+    case 'bb-del': {
+      const x = state.bbs.find((y) => y.id === el.dataset.id);
+      if (!x) break;
+      const before = [...state.bbs];
+      state.bbs = state.bbs.filter((y) => y.id !== x.id);
+      if (sheet) sheet.keepScroll = true;
+      render();
+      const { error } = await sb.from('book_boyfriends').delete().eq('id', x.id);
+      if (error) { state.bbs = before; render(); toast('Não consegui tirar do ranking.', true); }
+      else toast(`${x.name} saiu do ranking`);
+      break;
+    }
+    case 'tag-pick-open':
+      sheet.tagPick = !sheet.tagPick; sheet.keepScroll = true; render(); break;
+    case 'tag-color':
+      sheet.newTagColor = Number(el.dataset.value); sheet.keepScroll = true; render(); break;
+    case 'tag-toggle': {
+      const set = new Set(b.tags || []);
+      const v = el.dataset.value;
+      set.has(v) ? set.delete(v) : set.add(v);
+      sheet.keepScroll = true;
+      // Mantém a ordem da lista de etiquetas.
+      updateBook(b.id, { tags: allTags().map((t) => t.id).filter((id) => set.has(id)) }); break;
+    }
+    case 'stamp-open':
+      sheet.stampPick = !sheet.stampPick; sheet.keepScroll = true; render(); break;
+    case 'obs-pick':
+      sheet.stampPick = false;
+      setField(b, 'obsession', el.dataset.value || null); break;
     case 'hs': {
       // Setas das faixas que rolam para o lado (no computador).
       const strip = el.parentElement.querySelector('.hstrip');
@@ -1642,13 +1932,6 @@ document.addEventListener('click', async (e) => {
       sheet.keepScroll = true;
       updateBook(b.id, { spicy: b.spicy === v ? null : v }); break;
     }
-    case 'genre': {
-      const g = el.dataset.value;
-      const set = new Set(b.genres || []);
-      set.has(g) ? set.delete(g) : set.add(g);
-      sheet.keepScroll = true;
-      updateBook(b.id, { genres: [...set] }); break;
-    }
     case 'chip-del': {
       const f = el.dataset.field;
       const arr = [...(b[f] || [])];
@@ -1711,6 +1994,31 @@ document.addEventListener('submit', async (e) => {
     const goals = { ...(meta().goals || {}), [thisYear()]: goal };
     if (await saveMeta({ goals })) toast(`Meta de ${thisYear()}: ${goal} livros`);
   }
+  if (e.target.id === 'tagForm') {
+    const sheet = state.sheet;
+    const b = byId(sheet.id);
+    const name = e.target.name.value.trim();
+    if (!name) { toast('Dê um nome para a etiqueta.', true); return; }
+    const existing = allTags().find((t) => norm(t.label) === norm(name));
+    let id = existing?.id;
+    if (!existing) {
+      const [bg, ink] = TAG_PALETTE[sheet.newTagColor || 0];
+      id = 'c-' + Date.now().toString(36);
+      const customTags = [...(meta().customTags || []), { id, label: name, bg, ink, icon: 'bookmark' }];
+      if (!(await saveMeta({ customTags }))) return;
+    }
+    sheet.newTag = ''; sheet.keepScroll = true;
+    if (!(b.tags || []).includes(id)) updateBook(b.id, { tags: [...(b.tags || []), id] });
+    else render();
+    toast(existing ? `${existing.label} já existia: colei no livro` : `Etiqueta ${name} criada`);
+  }
+  if (e.target.id === 'bbForm') {
+    const sheet = state.sheet;
+    const name = e.target.name.value.trim();
+    if (!name) { toast('Escreva o nome do personagem.', true); return; }
+    if (!sheet.bbBook) { toast('Escolha de qual livro ele é.', true); return; }
+    if (await addBB(sheet.bbBook, name)) { sheet.bbName = ''; sheet.addOpen = false; sheet.keepScroll = true; render(); }
+  }
   if (e.target.id === 'manualForm') {
     const f = e.target;
     const title = f.title.value.trim();
@@ -1737,6 +2045,8 @@ document.addEventListener('input', (e) => {
     if (k) state.sheet[k] = t.value;
     return;
   }
+  if (t.form?.id === 'tagForm' && t.name === 'name') { state.sheet.newTag = t.value; return; }
+  if (t.id === 'bbName') { state.sheet.bbName = t.value; return; }
   if (t.id === 'why') {
     const b = byId(state.sheet.id);
     updateBook(b.id, { why_it_marked: t.value || null }, { rerender: false, quiet: true });
@@ -1777,6 +2087,14 @@ document.addEventListener('keydown', (e) => {
     updateBook(b.id, { [f]: arr });
     setTimeout(() => document.querySelector(`[data-chip="${f}"]`)?.focus(), 0);
   }
+  if (t.dataset?.bb && e.key === 'Enter') {
+    e.preventDefault();
+    const val = t.value.trim();
+    if (!val) return;
+    t.value = '';
+    state.sheet.keepScroll = true;
+    addBB(t.dataset.bb, val).then((ok) => { if (ok) setTimeout(() => document.getElementById('bbNew')?.focus(), 0); });
+  }
   if (t.getAttribute?.('for') === 'coverFile' && (e.key === 'Enter' || e.key === ' ')) {
     e.preventDefault();
     document.getElementById('coverFile')?.click();
@@ -1788,6 +2106,42 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 'Escape' && state.sheet) { state.sheet = null; render(); }
+});
+
+// Arrastar para reordenar o ranking (no computador).
+let dragBB = null;
+document.addEventListener('dragstart', (e) => {
+  const row = e.target.closest?.('[data-bb-id]');
+  if (!row) return;
+  dragBB = row.dataset.bbId;
+  row.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', dragBB); } catch { /* alguns navegadores */ }
+});
+document.addEventListener('dragover', (e) => {
+  const row = e.target.closest?.('[data-bb-id]');
+  if (!row || !dragBB) return;
+  e.preventDefault();
+  document.querySelectorAll('.bb-row.over').forEach((r) => r !== row && r.classList.remove('over'));
+  row.classList.add('over');
+});
+document.addEventListener('dragend', () => {
+  dragBB = null;
+  document.querySelectorAll('.bb-row.dragging, .bb-row.over').forEach((r) => r.classList.remove('dragging', 'over'));
+});
+document.addEventListener('drop', (e) => {
+  const row = e.target.closest?.('[data-bb-id]');
+  if (!row || !dragBB) return;
+  e.preventDefault();
+  const from = state.bbs.findIndex((x) => x.id === dragBB);
+  const to = state.bbs.findIndex((x) => x.id === row.dataset.bbId);
+  dragBB = null;
+  if (from < 0 || to < 0 || from === to) { render(); return; }
+  const list = [...state.bbs];
+  const [moved] = list.splice(from, 1);
+  list.splice(to, 0, moved);
+  if (state.sheet) state.sheet.keepScroll = true;
+  saveRanking(list);
 });
 
 // Setas laterais só aparecem quando a faixa tem mais conteúdo do que cabe.
@@ -1813,7 +2167,7 @@ document.addEventListener('wheel', (e) => {
 
 /* ---------------- atualização sem cache ---------------- */
 // Quando eu publico uma versão nova, o app percebe e recarrega sozinho com os arquivos novos.
-const APP_VERSION = '2026.11.01-1';
+const APP_VERSION = '2026.11.01-2';
 async function checkVersion() {
   try {
     const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
@@ -1833,8 +2187,8 @@ checkVersion();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
 
 /* ---------------- início ---------------- */
-let savedTheme = 'editorial';
-try { savedTheme = localStorage.getItem(THEME_KEY) || 'editorial'; } catch { /* sem armazenamento */ }
+let savedTheme = 'bookish';
+try { savedTheme = localStorage.getItem(THEME_KEY) || 'bookish'; } catch { /* sem armazenamento */ }
 applyTheme(savedTheme);
 try { if (localStorage.getItem('bo.view') === 'shelf') state.view = 'shelf'; } catch { /* sem armazenamento */ }
 

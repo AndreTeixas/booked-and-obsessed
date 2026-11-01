@@ -5,23 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Booked &amp; Obsessed</title>
   <meta name="description" content="for readers who feel too much">
-  <meta name="theme-color" content="#FAF6F2" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1E191B" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F6ECE2">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Booked">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script>
     // Aplica o tema salvo antes de desenhar a página, para não piscar o tema padrão.
-    try { var t = localStorage.getItem('bo.theme'); if (t && t !== 'editorial') document.documentElement.dataset.theme = t; } catch (e) {}
+    try { var t = localStorage.getItem('bo.theme'); if (t === 'starlight' || t === 'dragonfire') document.documentElement.dataset.theme = t; } catch (e) {}
   </script>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500;1,600&family=Jost:wght@300;400;500&display=swap">
-  <link rel="stylesheet" href="styles.css?v=2026.11.01-1">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Caveat:wght@500;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500;1,600&family=Courier+Prime:wght@400;700&family=Jost:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="styles.css?v=2026.11.01-2">
 </head>
 <body>
   <div id="app" aria-live="polite">
@@ -30,6 +29,6 @@
     </div>
   </div>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script type="module" src="app.js?v=2026.11.01-1"></script>
+  <script type="module" src="app.js?v=2026.11.01-2"></script>
 </body>
 </html>
