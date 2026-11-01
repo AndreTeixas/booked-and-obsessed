@@ -220,7 +220,7 @@ img { max-width: 100%; display: block; }
 .shell { min-height: 100dvh; padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 24px); }
 .page {
   position: relative;
-  max-width: 960px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: max(24px, env(safe-area-inset-top)) var(--gutter-r) 0 var(--gutter-l);
   display: flex;
@@ -304,6 +304,23 @@ img { max-width: 100%; display: block; }
 }
 @media (min-width: 640px) { .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 18px; } }
 @media (min-width: 900px) { .grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@media (min-width: 1150px) { .grid { grid-template-columns: repeat(8, minmax(0, 1fr)); column-gap: 22px; } }
+
+/* Faixas que rolam para o lado: no computador ganham setas. */
+.hs-wrap { position: relative; }
+.hs-btn {
+  display: none; position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 36px; height: 36px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  font-size: 22px; line-height: 1; box-shadow: 0 6px 14px -8px var(--shadow);
+}
+.hs-btn.prev { left: -6px; }
+.hs-btn.next { right: -6px; }
+@media (hover: hover) and (pointer: fine) {
+  .hs-wrap[data-overflow="true"] .hs-btn { display: inline-flex; align-items: center; justify-content: center; }
+  .hstrip, .tabs { scrollbar-width: thin; }
+  .hstrip::-webkit-scrollbar, .tabs::-webkit-scrollbar { display: block; height: 6px; }
+  .hstrip::-webkit-scrollbar-thumb, .tabs::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+}
 
 .card { border: none; background: none; padding: 0; text-align: left; display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--ink); }
 .card .ttl { font-size: 13px; font-weight: 500; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -348,7 +365,7 @@ img { max-width: 100%; display: block; }
   background: var(--bg);
   border-top: 1px solid var(--line);
 }
-.nav-inner { max-width: 960px; margin: 0 auto; height: var(--nav-h); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; }
+.nav-inner { max-width: 1180px; margin: 0 auto; height: var(--nav-h); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; }
 .nav-item { border: none; background: none; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); height: 100%; justify-content: center; }
 .nav-item .dot { width: 4px; height: 4px; border-radius: 2px; }
 .nav-item[aria-current="page"] { color: var(--ink); font-weight: 500; }
@@ -474,10 +491,21 @@ img { max-width: 100%; display: block; }
 .segmented button[aria-pressed="true"] { background: var(--ink); color: var(--bg); font-weight: 500; }
 .lang-filter { display: flex; gap: 6px; }
 .results { display: flex; flex-direction: column; }
+.result-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: 8px; border-bottom: 1px solid var(--line); }
+.result-row.open { background: var(--blush); border-radius: 12px; padding: 0 10px 12px; margin: 0 -10px; border-bottom-color: transparent; }
 .result {
-  display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border: none; border-bottom: 1px solid var(--line);
-  background: none; text-align: left; color: var(--ink); width: 100%;
+  display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border: none;
+  background: none; text-align: left; color: var(--ink); width: 100%; min-width: 0;
 }
+.quick-add {
+  margin-top: 14px; width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--ink); background: transparent; color: var(--ink);
+  display: inline-flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.quick-add.done { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.quick-add.busy { border-style: dashed; color: var(--muted); }
+.owned { grid-column: 1 / -1; margin: -8px 0 10px 70px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.picked.inline { grid-column: 1 / -1; background: transparent; padding: 0; }
+.quick-status { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .result .info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .result .rt { font-family: var(--serif); font-weight: 600; font-size: 19px; line-height: 1.1; }
 .result .ra { font-size: 13px; color: var(--muted); }
@@ -534,17 +562,26 @@ img { max-width: 100%; display: block; }
 .segmented.small button { height: 32px; min-width: 0; padding: 0 12px; font-size: 13px; }
 .hint.center { text-align: center; }
 
+/* Fundo da estante: nos temas claros é a própria cor do fundo do tema;
+   nos escuros, um tom de madeira escura misturado ao fundo. */
+:root { --shelf-classic: var(--bg); --shelf-lights: var(--bg); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) { --shelf-classic: color-mix(in srgb, var(--bg) 55%, #3A2A22); --shelf-lights: color-mix(in srgb, var(--bg) 45%, #241A1C); }
+}
+:root[data-theme="noite"], :root[data-theme="lua"], :root[data-theme="famiglia"], :root[data-theme="sombra"] {
+  --shelf-classic: color-mix(in srgb, var(--bg) 55%, #3A2A22); --shelf-lights: color-mix(in srgb, var(--bg) 45%, #241A1C);
+}
 .bookcase {
   --row: 130px; --plank: 14px;
   --wood-hi: #A06E4A; --wood: #8A5A3B; --wood-lo: #6E4529;
-  --panel: color-mix(in srgb, var(--bg) 50%, #D6BC9A);
+  --panel: var(--shelf-classic);
   --bookend: #5A3A26;
   border-radius: 6px;
 }
 .bookcase.bc-classica { border: 12px solid var(--wood); border-bottom-width: 0; background: var(--panel); padding-top: 10px; box-shadow: 0 18px 30px -18px var(--shadow); }
 .bookcase.bc-luzinhas {
   --wood-hi: #5A4032; --wood: #4A3428; --wood-lo: #3B2A22; --bookend: #5A4032;
-  --panel: color-mix(in srgb, var(--bg) 45%, #241A1C);
+  --panel: var(--shelf-lights);
   border: 12px solid var(--wood-lo); border-bottom-width: 0; background: var(--panel); padding-top: 12px; box-shadow: 0 18px 30px -16px rgba(0, 0, 0, 0.7);
 }
 .bookcase.bc-flutuante {

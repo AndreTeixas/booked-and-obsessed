@@ -701,7 +701,7 @@ function renderLibrary() {
     ${state.theme !== 'noite' ? ornamentHTML() : ''}
 
     <label class="search" for="q">${ic.search}
-      <input id="q" type="search" placeholder="Buscar título, autora ou trope" value="${esc(state.query)}" autocomplete="off">
+      <input id="q" type="search" placeholder="Buscar título, autora ou personagem" value="${esc(state.query)}" autocomplete="off">
     </label>
 
     <div id="libBody" class="lib-body">${libBodyHTML()}</div>
@@ -761,13 +761,17 @@ function libBodyHTML() {
       ${STATUSES.map((s) => `<button class="tab" role="tab" data-action="status" data-value="${s.id}" aria-selected="${!state.query && state.filter.type === 'status' && state.filter.value === s.id}">${s.tab} <sup>${counts[s.id]}</sup></button>`).join('')}
     </div>
 
-    <div class="collections" aria-label="Coleções">
-      ${COLLECTIONS.map((c) => {
-        const n = state.books.filter(c.test).length;
-        const on = !state.query && state.filter.type === 'collection' && state.filter.value === c.id;
-        return `<button class="coll ${c.cls}" data-action="collection" data-value="${c.id}" aria-pressed="${on}">
-          <span class="t">${c.label}</span><span class="n">${n ? `${n} ${n === 1 ? 'livro' : 'livros'}` : 'para preencher'}</span></button>`;
-      }).join('')}
+    <div class="hs-wrap">
+      <button class="hs-btn prev" data-action="hs" data-dir="-1" aria-label="Ver coleções anteriores">‹</button>
+      <div class="collections hstrip" aria-label="Coleções">
+        ${COLLECTIONS.map((c) => {
+          const n = state.books.filter(c.test).length;
+          const on = !state.query && state.filter.type === 'collection' && state.filter.value === c.id;
+          return `<button class="coll ${c.cls}" data-action="collection" data-value="${c.id}" aria-pressed="${on}">
+            <span class="t">${c.label}</span><span class="n">${n ? `${n} ${n === 1 ? 'livro' : 'livros'}` : 'para preencher'}</span></button>`;
+        }).join('')}
+      </div>
+      <button class="hs-btn next" data-action="hs" data-dir="1" aria-label="Ver mais coleções">›</button>
     </div>
 
     ${banner}
@@ -1204,7 +1208,6 @@ function renderBook(b) {
       <div class="row"><label for="f-pos">Livro nº</label><div class="ctrl"><input id="f-pos" class="num" type="number" inputmode="decimal" step="0.5" min="0" data-field="series_position" value="${b.series_position ?? ''}"></div></div>
       <div class="row stack"><span class="label-plain label">Gênero</span>
         <div class="chips">${GENRES.map((g) => `<button class="chip" data-action="genre" data-value="${esc(g)}" aria-pressed="${(b.genres || []).includes(g)}">${g}</button>`).join('')}</div></div>
-      <div class="row stack"><span class="label">Tropes</span>${chipList(b, 'tropes', '+ trope')}</div>
       <div class="row stack"><span class="label">Personagens</span>${chipList(b, 'characters', '+ personagem')}</div>
       <div class="row stack"><span class="label">Book boyfriends</span>${chipList(b, 'book_boyfriends', '+ book boyfriend')}</div>
       <label class="switch" for="f-reler">Quero reler<input id="f-reler" type="checkbox" data-field="want_reread" ${b.want_reread ? 'checked' : ''}></label>
@@ -1254,35 +1257,43 @@ function renderAdd() {
     <div class="lang-filter">
       ${[['', 'Todos'], ['pt', 'Português'], ['en', 'Inglês']].map(([v, l]) => `<button class="chip" data-action="lang" data-value="${v}" aria-pressed="${(s.lang || '') === v}">${l}</button>`).join('')}
     </div>
-
-    ${picked ? `
-      <div class="picked">
-        <div style="display:flex;gap:14px;align-items:flex-start">
-          ${coverHTML({ title: picked.title, author: picked.author, cover_url: picked.cover }, 'sm')}
-          <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
-            <span class="serif" style="font-weight:600;font-size:20px;line-height:1.1">${esc(picked.title)}</span>
-            <span class="hint">${esc(picked.author)}${picked.pages ? ` · ${picked.pages} págs.` : ''}</span>
-            ${picked.cover ? `<span class="cover-src">Capa: ${resultSource(picked)}</span>` : ''}
-          </div>
-        </div>
-        <div class="field"><span class="label">Entra como</span>${ddHTML('p-status', s.pStatus || 'tbr', STATUSES.map((x) => ({ id: x.id, label: x.one })), { cls: 'dd-field', label: 'Entra como' })}</div>
-        <button class="btn primary" data-action="add-confirm">Adicionar à Library</button>
-      </div>` : ''}
+    <div class="quick-status">
+      <span class="label">O botão + adiciona como</span>
+      ${ddHTML('q-status', s.qStatus || 'tbr', STATUSES.map((x) => ({ id: x.id, label: x.one })), { cls: 'dd-right', label: 'Status do botão +' })}
+    </div>
 
     <div class="results">
-      ${s.loading ? '<p class="hint">Buscando…</p>' : ''}
+      ${s.loading && !results.length ? '<p class="hint">Buscando…</p>' : ''}
       ${s.error ? `<p class="hint">${esc(s.error)}</p>` : ''}
       ${!s.loading && s.q && s.results && !results.length ? '<p class="hint">Nenhuma edição encontrada com esse filtro.</p>' : ''}
-      ${results.map((r) => `
-        <button class="result" data-action="pick" data-gid="${esc(r.gid)}" aria-pressed="${picked?.gid === r.gid}">
-          ${coverHTML({ title: r.title, author: r.author, cover_url: r.cover }, 'sm')}
-          <span class="info">
-            <span class="rt">${esc(r.title)}</span>
-            <span class="ra">${esc(r.author || 'Autora desconhecida')}</span>
-            <span class="rm">${[r.language === 'pt' ? 'Português' : r.language === 'en' ? 'Inglês' : '', r.pages ? `${r.pages} págs.` : '', r.year].filter(Boolean).join(' · ')}</span>
-            <span class="cover-src">${r.cover ? 'Capa: ' : 'Sem capa · '}${resultSource(r)}</span>
-          </span>
-        </button>`).join('')}
+      ${results.map((r) => {
+        const owned = inLibrary(r);
+        const added = s.added?.[r.gid];
+        const open = picked?.gid === r.gid;
+        return `
+        <div class="result-row${open ? ' open' : ''}">
+          <button class="result" data-action="pick" data-gid="${esc(r.gid)}" aria-expanded="${open}">
+            ${coverHTML({ title: r.title, author: r.author, cover_url: r.cover }, 'sm')}
+            <span class="info">
+              <span class="rt">${esc(r.title)}</span>
+              <span class="ra">${esc(r.author || 'Autora desconhecida')}</span>
+              <span class="rm">${[r.language === 'pt' ? 'Português' : r.language === 'en' ? 'Inglês' : '', r.pages ? `${r.pages} págs.` : '', r.year].filter(Boolean).join(' · ')}</span>
+              <span class="cover-src">${r.cover ? 'Capa: ' : 'Sem capa · '}${resultSource(r)}</span>
+            </span>
+          </button>
+          ${added
+            ? `<span class="quick-add done" aria-label="Adicionado">${ic.check}</span>`
+            : added === false
+              ? '<span class="quick-add busy" aria-label="Adicionando">…</span>'
+              : `<button class="quick-add" data-action="quick-add" data-gid="${esc(r.gid)}" aria-label="Adicionar ${esc(r.title)} como ${esc(STATUSES.find((x) => x.id === (s.qStatus || 'tbr')).one)}">${ic.plus}</button>`}
+          ${owned && !added ? '<span class="owned">já está na sua Library</span>' : ''}
+          ${open ? `
+          <div class="picked inline">
+            <div class="field"><span class="label">Entra como</span>${ddHTML('p-status', s.pStatus || 'tbr', STATUSES.map((x) => ({ id: x.id, label: x.one })), { cls: 'dd-field', label: 'Entra como' })}</div>
+            <button class="btn primary" data-action="add-confirm">Adicionar e abrir a ficha</button>
+          </div>` : ''}
+        </div>`;
+      }).join('')}
     </div>
     <button class="linkbtn" data-action="manual-on">Não achei, quero adicionar à mão</button>
     `}
@@ -1367,6 +1378,7 @@ function render() {
   const main = state.view === 'shelf' ? renderShelf() : renderLibrary();
   app.innerHTML = `<div class="shell" ${sheet ? 'aria-hidden="true"' : ''}>${main}</div>${renderNav()}${sheet}`;
   document.body.style.overflow = sheet ? 'hidden' : '';
+  markOverflow();
   if (state.view === 'shelf' && state.loaded) {
     paintSpines();
     if (seenSet().size === 0) markShelfSeen(); // primeira visita: tudo já conta como visto
@@ -1390,26 +1402,48 @@ function render() {
 /* ---------------- ações ---------------- */
 let searchTimer;
 let libTimer;
+// Cada busca ganha um número; só a mais recente pode mudar a lista.
+// (Antes, uma busca antiga e lenta podia terminar depois e apagar a lista atual.)
 async function runAddSearch(q) {
   const s = state.sheet;
+  const seq = (s.seq = (s.seq || 0) + 1);
   s.q = q;
-  if (!q.trim()) { s.results = null; render(); return; }
+  if (!q.trim()) { s.results = null; s.loading = false; render(); return; }
   s.loading = true; s.error = null; render();
+  let results = null; let error = null;
   try {
-    s.results = s.mode === 'author' ? await searchByAuthor(q) : await searchBooks(q, { max: 30 });
-  } catch (err) { s.error = searchErrorText(err); s.results = []; }
-  if (state.sheet === s) { s.loading = false; render(); }
+    results = s.mode === 'author' ? await searchByAuthor(q) : await searchBooks(q, { max: 30 });
+  } catch (err) { error = searchErrorText(err); }
+  if (state.sheet !== s || s.seq !== seq) return;
+  s.loading = false;
+  if (error) { s.error = error; if (!s.results) s.results = []; } else { s.results = results; s.error = null; }
+  s.keepScroll = true;
+  render();
 }
 async function runCoverSearch(q) {
   const s = state.sheet;
+  const seq = (s.seq = (s.seq || 0) + 1);
   s.q = q; s.loading = true; s.error = null; render();
   if (s.mode === 'author') s.authorQ = q; else s.titleQ = q;
   if (!q.trim()) { s.loading = false; s.results = []; render(); return; }
+  let results = null; let error = null;
   try {
-    s.results = s.mode === 'author' ? await searchByAuthor(q) : await searchBooks(q, { max: 30 });
-  } catch (err) { s.error = searchErrorText(err); s.results = []; }
-  if (state.sheet === s) { s.loading = false; render(); }
+    results = s.mode === 'author' ? await searchByAuthor(q) : await searchBooks(q, { max: 30 });
+  } catch (err) { error = searchErrorText(err); }
+  if (state.sheet !== s || s.seq !== seq) return;
+  s.loading = false;
+  if (error) { s.error = error; if (!s.results) s.results = []; } else { s.results = results; s.error = null; }
+  render();
 }
+
+// O livro da busca já está na Library? (mesmo título e mesma autora)
+function inLibrary(r) {
+  const t = mainTitle(r.title);
+  const a = simpleText((r.author || '').split(',')[0]).split(' ').pop() || '';
+  return state.books.some((b) => mainTitle(cleanTitle(b.title)) === t && (!a || simpleText(b.author).includes(a)));
+}
+
+const bookFromResult = (p, status) => ({ title: p.title, author: p.author || null, pages: p.pages, language: p.language, cover_url: p.cover, cover_source_url: p.cover, google_books_id: p.gid, status, current_page: status === 'lendo' ? 0 : status === 'lido' ? p.pages : null, finished_at: status === 'lido' ? new Date().toISOString().slice(0, 10) : null });
 
 // Grava um campo do livro com as regras automáticas de status.
 function setField(b, field, v) {
@@ -1469,6 +1503,7 @@ document.addEventListener('click', async (e) => {
       state.dd = null;
       if (sheet) sheet.keepScroll = true;
       if (k === 'p-status') { sheet.pStatus = v; render(); break; }
+      if (k === 'q-status') { sheet.qStatus = v; render(); break; }
       if (k === 'm-status') { sheet.mStatus = v; render(); break; }
       if (b && ['obsession', 'status', 'language'].includes(k)) setField(b, k, v);
       else render();
@@ -1539,7 +1574,13 @@ document.addEventListener('click', async (e) => {
     case 'open':
       state.sheet = { kind: 'book', id: el.dataset.id }; render(); document.querySelector('.sheet')?.scrollTo(0, 0); break;
     case 'close':
-      state.sheet = null; render(); break;
+      state.sheet = null; render(); checkVersion(); break;
+    case 'hs': {
+      // Setas das faixas que rolam para o lado (no computador).
+      const strip = el.parentElement.querySelector('.hstrip');
+      if (strip) strip.scrollBy({ left: Number(el.dataset.dir) * strip.clientWidth * 0.8, behavior: 'smooth' });
+      break;
+    }
     case 'add':
       state.sheet = { kind: 'add', q: '', lang: '' }; render(); document.getElementById('gq')?.focus(); break;
     case 'search-mode': {
@@ -1553,13 +1594,33 @@ document.addEventListener('click', async (e) => {
     }
     case 'lang':
       sheet.lang = el.dataset.value; render(); break;
-    case 'pick':
-      sheet.picked = sheet.results.find((r) => r.gid === el.dataset.gid); sheet.keepScroll = true; render(); document.querySelector('.picked')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); break;
+    case 'pick': {
+      // Abre as opções logo abaixo do livro tocado, sem mexer no resto da lista.
+      const gid = el.dataset.gid;
+      sheet.picked = sheet.picked?.gid === gid ? null : sheet.results.find((r) => r.gid === gid);
+      sheet.keepScroll = true; render(); break;
+    }
+    case 'quick-add': {
+      const r = sheet.results.find((x) => x.gid === el.dataset.gid);
+      if (!r) break;
+      const status = sheet.qStatus || 'tbr';
+      sheet.added = sheet.added || {};
+      sheet.added[r.gid] = false;
+      sheet.keepScroll = true; render();
+      const row = await insertBook(bookFromResult(r, status));
+      if (row) {
+        sheet.added[r.gid] = row.id;
+        toast(`Adicionado: ${cleanTitle(r.title)}`);
+        if (r.cover) cacheCover(row.id, r.cover);
+      } else delete sheet.added[r.gid];
+      if (state.sheet === sheet) { sheet.keepScroll = true; render(); }
+      break;
+    }
     case 'add-confirm': {
       const p = sheet.picked;
       const status = sheet.pStatus || 'tbr';
       el.disabled = true;
-      const row = await insertBook({ title: p.title, author: p.author || null, pages: p.pages, language: p.language, cover_url: p.cover, google_books_id: p.gid, status, current_page: status === 'lendo' ? 0 : null });
+      const row = await insertBook(bookFromResult(p, status));
       if (row) {
         state.sheet = { kind: 'book', id: row.id }; toast('Adicionado à Library'); render();
         if (p.cover && await cacheCover(row.id, p.cover)) render();
@@ -1729,20 +1790,41 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && state.sheet) { state.sheet = null; render(); }
 });
 
+// Setas laterais só aparecem quando a faixa tem mais conteúdo do que cabe.
+function markOverflow() {
+  document.querySelectorAll('.hs-wrap').forEach((w) => {
+    const s = w.querySelector('.hstrip');
+    w.dataset.overflow = s && s.scrollWidth > s.clientWidth + 4 ? 'true' : 'false';
+  });
+}
+window.addEventListener('resize', () => { clearTimeout(markOverflow.t); markOverflow.t = setTimeout(markOverflow, 150); });
+
+// No computador, a rodinha do mouse rola as faixas laterais (coleções, abas) para o lado.
+document.addEventListener('wheel', (e) => {
+  const strip = e.target.closest?.('.hstrip, .tabs');
+  if (!strip || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+  const max = strip.scrollWidth - strip.clientWidth;
+  if (max <= 0) return;
+  const next = strip.scrollLeft + e.deltaY;
+  if ((e.deltaY < 0 && strip.scrollLeft <= 0) || (e.deltaY > 0 && strip.scrollLeft >= max)) return; // no fim, deixa a página rolar
+  strip.scrollLeft = Math.max(0, Math.min(max, next));
+  e.preventDefault();
+}, { passive: false });
+
 /* ---------------- atualização sem cache ---------------- */
 // Quando eu publico uma versão nova, o app percebe e recarrega sozinho com os arquivos novos.
-const APP_VERSION = '2026.10.23-4';
+const APP_VERSION = '2026.11.01-1';
 async function checkVersion() {
   try {
     const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) return;
     const { v } = await res.json();
     if (!v || v === APP_VERSION) return;
+    if (state.sheet || arrival) return; // não interrompe quem está com uma tela aberta (busca, ficha…)
     // Evita recarregar em círculo se o navegador insistir na versão antiga.
     let tried = null;
     try { tried = sessionStorage.getItem('bo.reloadedFor'); sessionStorage.setItem('bo.reloadedFor', v); } catch { /* sem armazenamento */ }
     if (tried === v) return;
-    if (state.sheet && document.activeElement?.matches?.('input, textarea')) return; // não interrompe quem está digitando
     location.replace(`${location.pathname}?v=${encodeURIComponent(v)}${location.hash}`);
   } catch { /* sem internet: segue com a versão atual */ }
 }
